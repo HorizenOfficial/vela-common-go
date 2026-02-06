@@ -151,8 +151,8 @@ func TestToHex(t *testing.T) {
 		{"256", "0x100"},
 		{"100", "0x64"},
 		{"12345", "0x3039"},
-		{"18446744073709551615", "0xffffffffffffffff"}, // Max uint64
-		{"340282366920938463463374607431768211455", "0xffffffffffffffffffffffffffffffff"}, // Max uint128
+		{"18446744073709551615", "0xffffffffffffffff"},                                                                                                           // Max uint64
+		{"340282366920938463463374607431768211455", "0xffffffffffffffffffffffffffffffff"},                                                                        // Max uint128
 		{"115792089237316195423570985008687907853269984665640564039457584007913129639935", "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"}, // Max uint256
 	}
 
@@ -321,7 +321,7 @@ func TestUnmarshalJSONOverflow(t *testing.T) {
 	var w wrapper
 	err := json.Unmarshal([]byte(jsonStr), &w)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "Uint256 overflow")
+	require.Contains(t, err.Error(), "hex string exceeds 256 bits")
 }
 
 func TestUnmarshalJSONRobustness(t *testing.T) {

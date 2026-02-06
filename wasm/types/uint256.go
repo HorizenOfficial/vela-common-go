@@ -1,10 +1,13 @@
+// Package types implements a 256-bit unsigned integer type.
 package types
 
 import (
 	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/bits"
+	"strings"
 )
 
 // Uint256 represents a 256-bit unsigned integer using 4 uint64 values.
@@ -12,6 +15,12 @@ import (
 //
 // All arithmetic operations are performed modulo 2^256 unless stated otherwise.
 type Uint256 [4]uint64
+
+// maxDecimalDigits is the maximum number of decimal digits in a 256-bit number.
+// Calculated as ceil(256 * log10(2)) = 78.
+const maxDecimalDigits = 78
+
+var hexDigits = []byte("0123456789abcdef")
 
 // NewUint256 creates a new Uint256 from a uint64 value.
 func NewUint256(v uint64) *Uint256 {
@@ -23,6 +32,9 @@ func NewUint256(v uint64) *Uint256 {
 // This matches modulo arithmetic semantics.
 func (z *Uint256) SetBytes(b []byte) *Uint256 {
 	*z = Uint256{}
+	if b == nil {
+		return z
+	}
 	if len(b) == 0 {
 		return z
 	}
@@ -39,6 +51,19 @@ func (z *Uint256) SetBytes(b []byte) *Uint256 {
 	z[0] = binary.BigEndian.Uint64(tmp[24:32])
 
 	return z
+}
+
+// SetHex parses a hex string (with or without "0x" prefix) into z.
+// Returns an error if the string is invalid or exceeds 256 bits.
+func (z *Uint256) SetHex(s string) error {
+	if strings.HasPrefix(s, "0x") || strings.HasPrefix(s, "0X") {
+		s = s[2:]
+	}
+	if len(s) == 0 {
+		*z = Uint256{}
+		return nil
+	}
+	return z.parseHex(s)
 }
 
 // Add sets z = x + y (mod 2^256) and returns z.
@@ -69,6 +94,16 @@ func (z *Uint256) Sub(x, y Uint256) *Uint256 {
 	z[2], borrow = bits.Sub64(x[2], y[2], borrow)
 	z[3], _ = bits.Sub64(x[3], y[3], borrow)
 	return z
+}
+
+// SubOverflow sets z = x - y and reports whether underflow occurred.
+func (z *Uint256) SubOverflow(x, y Uint256) (underflow bool) {
+	var borrow uint64
+	z[0], borrow = bits.Sub64(x[0], y[0], 0)
+	z[1], borrow = bits.Sub64(x[1], y[1], borrow)
+	z[2], borrow = bits.Sub64(x[2], y[2], borrow)
+	z[3], borrow = bits.Sub64(x[3], y[3], borrow)
+	return borrow != 0
 }
 
 // Cmp compares z and y and returns:
@@ -102,8 +137,8 @@ func (z Uint256) String() string {
 		return "0"
 	}
 
-	val := z                   // copy
-	res := make([]byte, 0, 78) // Max digits for 2^256
+	val := z
+	res := make([]byte, 0, maxDecimalDigits)
 
 	const ten = uint64(10)
 	for !val.IsZero() {
@@ -136,44 +171,41 @@ func (z Uint256) divModWord(divisor uint64) (Uint256, uint64) {
 }
 
 // ToHex returns the hex representation of z with "0x" prefix.
+// Leading zeros are removed, except for zero values which return "0x0".
 func (z Uint256) ToHex() string {
 	if z.IsZero() {
 		return "0x0"
 	}
-	// Similar logic to String() but base 16
-	val := z
-	res := make([]byte, 0, 66) // 0x + 64 hex digits
 
-	const sixteen = uint64(16)
-	const hexChars = "0123456789abcdef"
+	// Preallocate buffer for "0x" + up to 64 hex digits
+	buf := make([]byte, 2, 66)
+	buf[0], buf[1] = '0', 'x'
 
-	for !val.IsZero() {
-		var rem uint64
-		val, rem = val.divModWord(sixteen)
-		res = append(res, hexChars[rem])
+	// Encode each nibble, skipping leading zeros
+	leadingZero := true
+	for i := 3; i >= 0; i-- {
+		word := z[i]
+		for j := 60; j >= 0; j -= 4 {
+			b := byte((word >> j) & 0xf)
+			if leadingZero && b == 0 {
+				continue
+			}
+			leadingZero = false
+			buf = append(buf, hexDigits[b])
+		}
 	}
-	res = append(res, 'x', '0')
 
-	// reverse
-	for i, j := 0, len(res)-1; i < j; i, j = i+1, j-1 {
-		res[i], res[j] = res[j], res[i]
-	}
-	return string(res)
+	return string(buf)
 }
 
 // MarshalJSON implements json.Marshaler.
 // It marshals the Uint256 as a hex string with 0x prefix.
 func (z Uint256) MarshalJSON() ([]byte, error) {
-	s := z.ToHex()
-	buf := make([]byte, 0, len(s)+2)
-	buf = append(buf, '"')
-	buf = append(buf, s...)
-	buf = append(buf, '"')
-	return buf, nil
+	return json.Marshal(z.ToHex())
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
-// Only hex strings with "0x" prefix are accepted, or "null" string.
+// Accepts hex strings with "0x" prefix, or JSON null.
 func (z *Uint256) UnmarshalJSON(data []byte) error {
 	if z == nil {
 		return fmt.Errorf("Uint256: UnmarshalJSON on nil pointer")
@@ -182,50 +214,79 @@ func (z *Uint256) UnmarshalJSON(data []byte) error {
 		*z = Uint256{}
 		return nil
 	}
-	if len(data) < 2 || data[0] != '"' || data[len(data)-1] != '"' {
-		return fmt.Errorf("invalid Uint256 format: %s", string(data))
+
+	var s string
+	if err := json.Unmarshal(data, &s); err != nil {
+		return fmt.Errorf("invalid Uint256 format: %w", err)
 	}
-	s := string(data[1 : len(data)-1])
 
 	if len(s) < 2 || s[0] != '0' || s[1] != 'x' {
 		return fmt.Errorf("invalid Uint256 prefix: %s (only lowercase 0x is accepted)", s)
 	}
 
-	*z = Uint256{}
 	s = s[2:]
 	if len(s) == 0 {
 		return fmt.Errorf("invalid Uint256 format: empty hex string after 0x prefix")
 	}
 
-	const sixteen = uint64(16)
-	for _, c := range s {
-		var digit uint64
+	if err := z.parseHex(s); err != nil {
+		return fmt.Errorf("invalid Uint256 hex: %w", err)
+	}
+
+	return nil
+}
+
+// parseHex parses a hex string (without prefix) into z.
+// Returns an error if the string is invalid or exceeds 64 hex digits.
+func (z *Uint256) parseHex(s string) error {
+	if len(s) > 64 {
+		return errors.New("hex string exceeds 256 bits")
+	}
+
+	*z = Uint256{}
+
+	// Pad to 64 characters
+	if len(s) < 64 {
+		s = strings.Repeat("0", 64-len(s)) + s
+	}
+
+	// Parse each 16-character chunk as a uint64
+	for i := 0; i < 4; i++ {
+		chunk := s[16*i : 16*(i+1)]
+		word, err := parseHexWord(chunk)
+		if err != nil {
+			return err
+		}
+		z[3-i] = word
+	}
+
+	return nil
+}
+
+// parseHexWord parses exactly 16 hex characters into a uint64.
+func parseHexWord(s string) (uint64, error) {
+	var result uint64
+	for i := 0; i < 16; i++ {
+		c := s[i]
+		var nibble uint64
 		switch {
 		case c >= '0' && c <= '9':
-			digit = uint64(c - '0')
+			nibble = uint64(c - '0')
 		case c >= 'a' && c <= 'f':
-			digit = uint64(c - 'a' + 10)
+			nibble = uint64(c - 'a' + 10)
 		case c >= 'A' && c <= 'F':
-			digit = uint64(c - 'A' + 10)
+			nibble = uint64(c - 'A' + 10)
 		default:
-			return fmt.Errorf("invalid hex character in Uint256: %c", c)
+			return 0, fmt.Errorf("invalid hex character: %c", c)
 		}
-
-		if z.Mul64Overflow(sixteen) {
-			// we have modified z actually, but caller must check the error
-			return errors.New("Uint256 overflow after mul")
-		}
-		if z.Add64Overflow(digit) {
-			// we have modified z actually, but caller must check the error
-			return errors.New("Uint256 overflow after sum")
-		}
+		result = (result << 4) | nibble
 	}
-	return nil
+	return result, nil
 }
 
 // Mul64 sets z = z * y (mod 2^256).
 func (z *Uint256) Mul64(y uint64) {
-	_ = z.Mul64Overflow(y) // Discard the overflow flag
+	_ = z.Mul64Overflow(y)
 }
 
 // Mul64Overflow sets z = z * y and reports whether overflow occurred.
@@ -245,7 +306,7 @@ func (z *Uint256) Mul64Overflow(y uint64) (overflow bool) {
 
 // Add64 adds y to z (mod 2^256).
 func (z *Uint256) Add64(y uint64) {
-	_ = z.Add64Overflow(y) // Discard the overflow flag
+	_ = z.Add64Overflow(y)
 }
 
 // Add64Overflow adds y to z and reports whether overflow occurred.
