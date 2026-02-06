@@ -12,9 +12,12 @@ const AddressLength = 20
 type Address [AddressLength]byte
 
 // HexToAddress converts a hex string to Address with validation.
+// Only lowercase "0x" prefix is accepted for consistency with Uint256.
 func HexToAddress(s string) (Address, error) {
-	if strings.HasPrefix(s, "0x") || strings.HasPrefix(s, "0X") {
+	if strings.HasPrefix(s, "0x") {
 		s = s[2:]
+	} else if strings.HasPrefix(s, "0X") {
+		return Address{}, fmt.Errorf("invalid address prefix: only lowercase 0x is accepted")
 	}
 	if len(s) != AddressLength*2 {
 		return Address{}, fmt.Errorf("invalid address length: got %d hex chars, want %d", len(s), AddressLength*2)
@@ -36,7 +39,11 @@ func BytesToAddress(b []byte) Address {
 	return a
 }
 
+// SetBytes sets the address from a byte slice.
+// If b is longer than 20 bytes, only the last 20 bytes are used (left-truncation).
+// If b is shorter than 20 bytes, it is right-aligned (zero-padded on the left).
 func (a *Address) SetBytes(b []byte) {
+	*a = Address{}
 	if len(b) > AddressLength {
 		b = b[len(b)-AddressLength:]
 	}
@@ -50,11 +57,20 @@ func (a Address) Bytes() []byte {
 	return b
 }
 
+// IsZero returns true if the address is all zeros.
+func (a Address) IsZero() bool {
+	return a == Address{}
+}
+
 func (a Address) Hex() string {
 	return "0x" + hex.EncodeToString(a[:])
 }
 
 func (a *Address) UnmarshalJSON(data []byte) error {
+	if string(data) == "null" {
+		*a = Address{}
+		return nil
+	}
 	var s string
 	if err := json.Unmarshal(data, &s); err != nil {
 		return err

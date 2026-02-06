@@ -1,7 +1,7 @@
 package types
 
 const (
-	MaxBigIntBytes  = 64
+	MaxBigIntBytes  = 32
 	MaxAddressBytes = AddressLength
 )
 

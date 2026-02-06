@@ -11,9 +11,9 @@ import (
 func SerializeAndWriteResult(result any) *byte {
 	reportJSON, err := json.Marshal(result)
 	if err != nil {
-		return utils.StringToPtr([]byte(WasmSerializationError))
+		return utils.BytesToPtr([]byte(WasmSerializationError))
 	}
-	return utils.StringToPtr(reportJSON)
+	return utils.BytesToPtr(reportJSON)
 }
 
 // PtrToUint256 converts a WASM pointer and length into a Uint256.
@@ -25,7 +25,7 @@ func SerializeAndWriteResult(result any) *byte {
 // Semantics:
 //   - (nil, 0) represents the value 0
 //   - Any other (ptr, length) combination with ptr == nil or length < 0 is invalid
-//   - If length > 32, the value is interpreted modulo 2^256 (least-significant bytes kept)
+//   - If length > 32, a warning is logged and the input is truncated before passing to SetBytes
 //
 // The function returns nil on invalid input.
 func PtrToUint256(ptr *byte, length int32) *Uint256 {
@@ -46,7 +46,7 @@ func PtrToUint256(ptr *byte, length int32) *Uint256 {
 
 	// just to be on the very safe side and avoid panics. Should never happen
 	if length > MaxBigIntBytes {
-		println("Unexpected length for a big.Int ptr mem: truncating from", length, "to", MaxBigIntBytes)
+		utils.LogWarn("Unexpected length for a big.Int ptr mem: truncating from %d to %d", length, MaxBigIntBytes)
 		length = MaxBigIntBytes
 	}
 

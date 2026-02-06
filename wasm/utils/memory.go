@@ -26,7 +26,7 @@ var allocatedMemory = make(map[uintptr][]byte)
 // var freeList = make(map[int32][][]byte)
 
 // total memory (in bytes) currently allocated
-var cumulative_alloc_size int64
+var cumulativeAllocSize int64
 
 // --- WASM Memory Management Functions ---
 
@@ -50,11 +50,11 @@ func Allocate(size int32) int32 {
 	// Store a reference to the slice in our global map to "pin" it and preventing GC from acting
 	allocatedMemory[uptr] = data
 
-	cumulative_alloc_size += int64(size)
+	cumulativeAllocSize += int64(size)
 
 	// Return the pointer address as an int32 to the host.
 	// Go Wasmtime runtime receives the signed int32 bit pattern and casts them to uintptr when accessing memory
-	LogDebug("allocate returning ptr=%d (decimal=%d), total_allocated=%d", uptr, int32(uptr), cumulative_alloc_size)
+	LogDebug("allocate returning ptr=%d (decimal=%d), total_allocated=%d", uptr, int32(uptr), cumulativeAllocSize)
 	return int32(uptr)
 }
 
@@ -87,20 +87,20 @@ func Deallocate(ptr *byte, size int32) {
 
 	if int32(len(b)) != size {
 		// We could add more counters for errors and stats in future
-		LogWarn("deallocate: unexpected allocated size, expected=%d, got=%d", size, len(b))
+		LogWarn("deallocate: size mismatch, caller passed %d but allocation was %d", size, len(b))
 	}
 
-	cumulative_alloc_size -= int64(len(b))
-	LogDebug("deallocate returning, total_allocated=%d", cumulative_alloc_size)
+	cumulativeAllocSize -= int64(len(b))
+	LogDebug("deallocate returning, total_allocated=%d", cumulativeAllocSize)
 }
 
 // Note: if we call directly this function from the host, the ABI C interface foresees that
 // for multiple return values, the values are stored into a pointer passed as the first parameter by the caller.
 //
 //export get_allocated_memory_stats
-func GetAllocatedMemoryStats() (map_size, total_bytes int64) {
-	map_size = int64(len(allocatedMemory))
-	total_bytes = cumulative_alloc_size
+func GetAllocatedMemoryStats() (mapSize, totalBytes int64) {
+	mapSize = int64(len(allocatedMemory))
+	totalBytes = cumulativeAllocSize
 	return
 }
 
@@ -109,26 +109,26 @@ func GetAllocatedMemoryStats() (map_size, total_bytes int64) {
 // PtrToString converts a WASM pointer and length to a Go string.
 func PtrToString(ptr *byte, length int32) string {
 	if ptr == nil || length <= 0 {
-		println("Invalid ptr or length, ptr =", ptr, ", length =", length)
+		LogWarn("Invalid ptr or length, ptr=%v, length=%d", ptr, length)
 		return ""
 	}
 	return string(unsafe.Slice(ptr, length))
 }
 
 const (
-	// MaxWasmSize is the maximum size allowed for the data portion.
+	// MaxWasmDataSize is the maximum size allowed for the data portion.
 	// We subtract 4 to leave room for the 32-bit length prefix.
 	MaxWasmDataSize = math.MaxInt32 - 4
 )
 
-// StringToPtr converts a Go byte slice to an allocated memory pointer for WASM.
-func StringToPtr(data []byte) *byte {
+// BytesToPtr converts a Go byte slice to an allocated memory pointer for WASM.
+func BytesToPtr(data []byte) *byte {
 	dataLength := len(data)
 	if dataLength == 0 {
 		return nil
 	}
 	if dataLength > MaxWasmDataSize {
-		println("data len exceeds max int size, dataLength=", dataLength)
+		LogError("data len exceeds max int size, dataLength=%d", dataLength)
 		return nil
 	}
 

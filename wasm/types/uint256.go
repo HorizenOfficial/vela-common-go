@@ -20,7 +20,7 @@ type Uint256 [4]uint64
 // Calculated as ceil(256 * log10(2)) = 78.
 const maxDecimalDigits = 78
 
-var hexDigits = []byte("0123456789abcdef")
+const hexDigits = "0123456789abcdef"
 
 // NewUint256 creates a new Uint256 from a uint64 value.
 func NewUint256(v uint64) *Uint256 {
@@ -53,11 +53,24 @@ func (z *Uint256) SetBytes(b []byte) *Uint256 {
 	return z
 }
 
+// Bytes returns the value as a 32-byte big-endian slice.
+// Leading zero bytes are included.
+func (z Uint256) Bytes() []byte {
+	var buf [32]byte
+	binary.BigEndian.PutUint64(buf[0:8], z[3])
+	binary.BigEndian.PutUint64(buf[8:16], z[2])
+	binary.BigEndian.PutUint64(buf[16:24], z[1])
+	binary.BigEndian.PutUint64(buf[24:32], z[0])
+	return buf[:]
+}
+
 // SetHex parses a hex string (with or without "0x" prefix) into z.
 // Returns an error if the string is invalid or exceeds 256 bits.
 func (z *Uint256) SetHex(s string) error {
-	if strings.HasPrefix(s, "0x") || strings.HasPrefix(s, "0X") {
+	if strings.HasPrefix(s, "0x") {
 		s = s[2:]
+	} else if strings.HasPrefix(s, "0X") {
+		return fmt.Errorf("invalid Uint256 prefix: only lowercase 0x is accepted")
 	}
 	if len(s) == 0 {
 		*z = Uint256{}
@@ -124,6 +137,11 @@ func (z Uint256) Cmp(y Uint256) int {
 		}
 	}
 	return 0
+}
+
+// Eq returns true if z == y.
+func (z Uint256) Eq(y Uint256) bool {
+	return z == y
 }
 
 // IsZero returns true if z == 0.
@@ -245,15 +263,16 @@ func (z *Uint256) parseHex(s string) error {
 
 	*z = Uint256{}
 
-	// Pad to 64 characters
-	if len(s) < 64 {
-		s = strings.Repeat("0", 64-len(s)) + s
+	// Pad to 64 characters using a stack-allocated buffer
+	var buf [64]byte
+	for i := range buf {
+		buf[i] = '0'
 	}
+	copy(buf[64-len(s):], s)
 
 	// Parse each 16-character chunk as a uint64
-	for i := 0; i < 4; i++ {
-		chunk := s[16*i : 16*(i+1)]
-		word, err := parseHexWord(chunk)
+	for i := range 4 {
+		word, err := parseHexWord(string(buf[16*i : 16*(i+1)]))
 		if err != nil {
 			return err
 		}
@@ -266,7 +285,7 @@ func (z *Uint256) parseHex(s string) error {
 // parseHexWord parses exactly 16 hex characters into a uint64.
 func parseHexWord(s string) (uint64, error) {
 	var result uint64
-	for i := 0; i < 16; i++ {
+	for i := range 16 {
 		c := s[i]
 		var nibble uint64
 		switch {
