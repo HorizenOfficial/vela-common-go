@@ -1,6 +1,7 @@
 package types
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"math/big"
@@ -586,10 +587,139 @@ func TestAddOverflow(t *testing.T) {
 	})
 }
 
+func TestSubOverflow(t *testing.T) {
+	max256Big := new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), 256), big.NewInt(1))
+	max256 := *new(Uint256).SetBytes(max256Big.Bytes())
+	one := *NewUint256(1)
+	zero := *NewUint256(0)
+
+	t.Run("no underflow", func(t *testing.T) {
+		var res Uint256
+		underflow := res.SubOverflow(*NewUint256(200), *NewUint256(100))
+		require.False(t, underflow)
+		require.Equal(t, "100", res.String())
+	})
+
+	t.Run("underflow boundary", func(t *testing.T) {
+		var res Uint256
+		underflow := res.SubOverflow(zero, one)
+		require.True(t, underflow)
+		require.Equal(t, max256Big.String(), res.String()) // wraps to max
+	})
+
+	t.Run("zero minus zero", func(t *testing.T) {
+		var res Uint256
+		underflow := res.SubOverflow(zero, zero)
+		require.False(t, underflow)
+		require.Equal(t, "0", res.String())
+	})
+
+	t.Run("equal values", func(t *testing.T) {
+		var res Uint256
+		underflow := res.SubOverflow(max256, max256)
+		require.False(t, underflow)
+		require.Equal(t, "0", res.String())
+	})
+
+	t.Run("random cases", func(t *testing.T) {
+		r := rand.New(rand.NewSource(1234))
+		limit := new(big.Int).Lsh(big.NewInt(1), 256)
+
+		for range 100 {
+			b1 := new(big.Int).Rand(r, limit)
+			b2 := new(big.Int).Rand(r, limit)
+
+			u1 := new(Uint256).SetBytes(b1.Bytes())
+			u2 := new(Uint256).SetBytes(b2.Bytes())
+
+			expectedUnderflow := b1.Cmp(b2) < 0
+
+			var res Uint256
+			underflow := res.SubOverflow(*u1, *u2)
+
+			require.Equal(t, expectedUnderflow, underflow, "b1=%s, b2=%s", b1, b2)
+
+			// Verify result matches Sub (mod 2^256)
+			var res2 Uint256
+			res2.Sub(*u1, *u2)
+			require.Equal(t, res2.String(), res.String())
+		}
+	})
+}
+
 // Test for nil receiver from nova payment-app
 func TestUint256_UnmarshalJSON_NilReceiver(t *testing.T) {
 	var z *Uint256 = nil
 	err := z.UnmarshalJSON([]byte(`"0x1"`))
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "nil pointer")
+}
+
+func TestBytes(t *testing.T) {
+	tests := []struct {
+		name     string
+		decimal  string
+		expected []byte
+	}{
+		{"zero", "0", make([]byte, 32)},
+		{"one", "1", append(make([]byte, 31), 1)},
+		{"max uint64", "18446744073709551615", append(make([]byte, 24), 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff)},
+		{"max uint256", "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+			bytes.Repeat([]byte{0xff}, 32)},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b, _ := new(big.Int).SetString(tt.decimal, 10)
+			u := new(Uint256).SetBytes(b.Bytes())
+			require.Equal(t, tt.expected, u.Bytes())
+		})
+	}
+
+	// Round-trip: SetBytes(Bytes()) should be identity
+	t.Run("round trip", func(t *testing.T) {
+		r := rand.New(rand.NewSource(1234))
+		for range 200 {
+			b := new(big.Int).Rand(r, new(big.Int).Lsh(big.NewInt(1), 256))
+			u := new(Uint256).SetBytes(b.Bytes())
+			u2 := new(Uint256).SetBytes(u.Bytes())
+			require.Equal(t, u.String(), u2.String())
+		}
+	})
+}
+
+func TestSetHex(t *testing.T) {
+	tests := []struct {
+		name        string
+		input       string
+		expected    string
+		expectError bool
+		errContains string
+	}{
+		{"with 0x prefix", "0xff", "255", false, ""},
+		{"without prefix", "ff", "255", false, ""},
+		{"zero", "0x0", "0", false, ""},
+		{"empty after prefix", "0x", "0", false, ""},
+		{"empty string", "", "0", false, ""},
+		{"large value", "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", "115792089237316195423570985008687907853269984665640564039457584007913129639935", false, ""},
+		{"uppercase 0X rejected", "0Xff", "", true, "only lowercase 0x is accepted"},
+		{"exceeds 256 bits", "0x1" + strings.Repeat("0", 64), "", true, "hex string exceeds 256 bits"},
+		{"invalid hex char", "0xgg", "", true, "invalid hex character"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var u Uint256
+			err := u.SetHex(tt.input)
+			if tt.expectError {
+				require.Error(t, err)
+				if tt.errContains != "" {
+					require.Contains(t, err.Error(), tt.errContains)
+				}
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tt.expected, u.String())
+			}
+		})
+	}
 }
