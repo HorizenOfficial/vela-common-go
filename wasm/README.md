@@ -44,7 +44,7 @@ Runtime utilities for the WASM guest.
 | `BytesToPtr` | Converts a Go byte slice into a WASM-compatible pointer with a 4-byte little-endian length prefix. |
 | `PtrToString` | Converts a WASM pointer and length into a Go string. |
 | `GetAllocatedMemoryStats` | Returns current allocation count and cumulative size. Exported as `get_allocated_memory_stats`. |
-| `LogTrace` .. `LogError` | Leveled logging via WASI stdout pipe. The host parses prefixes (`[TRC]`, `[DBG]`, `[INF]`, `[WRN]`, `[ERR]`) to route to appropriate log levels. |
+| `LogTrace` .. `LogError` | Leveled logging via WASI stdout pipe. The host parses prefixes (`TRC`, `DBG`, `INF`, `WRN`, `ERR`) to route to appropriate log levels. |
 
 ## Usage
 

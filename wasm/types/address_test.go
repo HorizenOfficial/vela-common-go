@@ -22,9 +22,10 @@ func TestHexToAddress(t *testing.T) {
 			expected: "0x1234567890abcdef1234567890abcdef12345678",
 		},
 		{
-			name:     "valid address without prefix",
-			input:    "1234567890abcdef1234567890abcdef12345678",
-			expected: "0x1234567890abcdef1234567890abcdef12345678",
+			name:        "without prefix rejected",
+			input:       "1234567890abcdef1234567890abcdef12345678",
+			expectError: true,
+			errContains: "only lowercase 0x is accepted",
 		},
 		{
 			name:     "valid address uppercase hex digits",
@@ -63,7 +64,7 @@ func TestHexToAddress(t *testing.T) {
 			name:        "empty string",
 			input:       "",
 			expectError: true,
-			errContains: "invalid address length",
+			errContains: "only lowercase 0x is accepted",
 		},
 		{
 			name:        "only prefix",

@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"math/bits"
-	"strings"
 )
 
 // Uint256 represents a 256-bit unsigned integer using 4 uint64 values.
@@ -64,17 +63,15 @@ func (z Uint256) Bytes() []byte {
 	return buf[:]
 }
 
-// SetHex parses a hex string (with or without "0x" prefix) into z.
-// Returns an error if the string is invalid or exceeds 256 bits.
+// SetHex parses a hex string with "0x" prefix into z.
+// Returns an error if the prefix is missing, the string is invalid, or exceeds 256 bits.
 func (z *Uint256) SetHex(s string) error {
-	if strings.HasPrefix(s, "0x") {
-		s = s[2:]
-	} else if strings.HasPrefix(s, "0X") {
+	if len(s) < 2 || s[0] != '0' || s[1] != 'x' {
 		return fmt.Errorf("invalid Uint256 prefix: only lowercase 0x is accepted")
 	}
+	s = s[2:]
 	if len(s) == 0 {
-		*z = Uint256{}
-		return nil
+		return fmt.Errorf("invalid Uint256 format: empty hex string after 0x prefix")
 	}
 	return z.parseHex(s)
 }

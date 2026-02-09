@@ -4,7 +4,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"strings"
 )
 
 const AddressLength = 20
@@ -14,11 +13,10 @@ type Address [AddressLength]byte
 // HexToAddress converts a hex string to Address with validation.
 // Only lowercase "0x" prefix is accepted for consistency with Uint256.
 func HexToAddress(s string) (Address, error) {
-	if strings.HasPrefix(s, "0x") {
-		s = s[2:]
-	} else if strings.HasPrefix(s, "0X") {
+	if len(s) < 2 || s[0] != '0' || s[1] != 'x' {
 		return Address{}, fmt.Errorf("invalid address prefix: only lowercase 0x is accepted")
 	}
+	s = s[2:]
 	if len(s) != AddressLength*2 {
 		return Address{}, fmt.Errorf("invalid address length: got %d hex chars, want %d", len(s), AddressLength*2)
 	}

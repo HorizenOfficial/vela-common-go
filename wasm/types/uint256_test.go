@@ -9,7 +9,6 @@ import (
 	"math/rand"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -47,7 +46,7 @@ func TestSetBytes(t *testing.T) {
 
 func TestAdd(t *testing.T) {
 	// Compare against big.Int
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	r := rand.New(rand.NewSource(1234))
 
 	for i := 0; i < 1000; i++ {
 		// Generate two random big ints that fit in 256 bits
@@ -71,7 +70,7 @@ func TestAdd(t *testing.T) {
 }
 
 func TestSub(t *testing.T) {
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	r := rand.New(rand.NewSource(1234))
 
 	for i := 0; i < 1000; i++ {
 		b1 := new(big.Int).Rand(r, new(big.Int).Lsh(big.NewInt(1), 256))
@@ -370,6 +369,33 @@ func TestUnmarshalJSONRobustness(t *testing.T) {
 	}
 }
 
+func TestEq(t *testing.T) {
+	t.Run("equal zeros", func(t *testing.T) {
+		require.True(t, NewUint256(0).Eq(*NewUint256(0)))
+	})
+
+	t.Run("equal non-zero", func(t *testing.T) {
+		require.True(t, NewUint256(42).Eq(*NewUint256(42)))
+	})
+
+	t.Run("different values", func(t *testing.T) {
+		require.False(t, NewUint256(1).Eq(*NewUint256(2)))
+	})
+
+	t.Run("differ only in high word", func(t *testing.T) {
+		a := NewUint256(0)
+		b := NewUint256(0)
+		a[3] = 1
+		require.False(t, a.Eq(*b))
+	})
+
+	t.Run("max uint256 equal", func(t *testing.T) {
+		a := &Uint256{^uint64(0), ^uint64(0), ^uint64(0), ^uint64(0)}
+		b := &Uint256{^uint64(0), ^uint64(0), ^uint64(0), ^uint64(0)}
+		require.True(t, a.Eq(*b))
+	})
+}
+
 func TestIsZero(t *testing.T) {
 	require.True(t, NewUint256(0).IsZero())
 	require.False(t, NewUint256(1).IsZero())
@@ -462,7 +488,7 @@ func TestAdd64Overflow(t *testing.T) {
 	}
 
 	// Random test for overflow detection
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	r := rand.New(rand.NewSource(1234))
 	for i := 0; i < 200; i++ {
 		b := new(big.Int).Rand(r, new(big.Int).Lsh(big.NewInt(1), 256))
 		add := r.Uint64()
@@ -697,10 +723,10 @@ func TestSetHex(t *testing.T) {
 		errContains string
 	}{
 		{"with 0x prefix", "0xff", "255", false, ""},
-		{"without prefix", "ff", "255", false, ""},
+		{"without prefix rejected", "ff", "", true, "only lowercase 0x is accepted"},
 		{"zero", "0x0", "0", false, ""},
-		{"empty after prefix", "0x", "0", false, ""},
-		{"empty string", "", "0", false, ""},
+		{"empty after prefix rejected", "0x", "", true, "empty hex string after 0x prefix"},
+		{"empty string rejected", "", "", true, "only lowercase 0x is accepted"},
 		{"large value", "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", "115792089237316195423570985008687907853269984665640564039457584007913129639935", false, ""},
 		{"uppercase 0X rejected", "0Xff", "", true, "only lowercase 0x is accepted"},
 		{"exceeds 256 bits", "0x1" + strings.Repeat("0", 64), "", true, "hex string exceeds 256 bits"},
