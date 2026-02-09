@@ -27,8 +27,9 @@ func NewUint256(v uint64) *Uint256 {
 }
 
 // SetBytes interprets bytes as a big-endian unsigned integer.
-// Values larger than 256 bits are truncated (mod 2^256).
-// This matches modulo arithmetic semantics.
+// If b is longer than 32 bytes, only the last 32 bytes are used (left-truncation).
+// This matches the semantics of (*big.Int).Bytes() round-trips, where leading
+// zeros or a single high byte beyond 32 are safely discarded.
 func (z *Uint256) SetBytes(b []byte) *Uint256 {
 	*z = Uint256{}
 	if b == nil {

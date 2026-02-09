@@ -28,6 +28,7 @@ func TestSetBytes(t *testing.T) {
 		input    []byte
 		expected string // decimal string
 	}{
+		{"nil", nil, "0"},
 		{"empty", []byte{}, "0"},
 		{"zero", []byte{0}, "0"},
 		{"one byte", []byte{255}, "255"},
@@ -245,8 +246,8 @@ func TestJSON(t *testing.T) {
 		require.Equal(t, w.Val.String(), w2.Val.String())
 	})
 
-	t.Run("uppercase hex", func(t *testing.T) {
-		// Uppercase hex digits should work
+	t.Run("uppercase hex digits accepted", func(t *testing.T) {
+		// Uppercase hex digits should work (only uppercase 0X prefix is rejected)
 		jsonStr := `{"val": "0xFF"}`
 		var w wrapper
 		err := json.Unmarshal([]byte(jsonStr), &w)
