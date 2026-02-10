@@ -4,19 +4,24 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Common Go utility library for the Horizen Confidential Compute Environment (HCCE), focused on WebAssembly (WASM) support. Contains shared types and utilities used by WASM modules running within the Horizen blockchain system.
+Common Go utility library for the Horizen Confidential Compute Environment (HCCE). Contains shared types and utilities used across the Horizen blockchain system. Each top-level directory groups a domain of common code (e.g., `wasm/` for WebAssembly guest support). New domains are added as sibling directories at the same level as `wasm/`.
 
 **Origin:** Migrated from `horizen-pes/nova` repository as a shared library.
 **Downstream consumers:**
-- `horizen-pes/app` (simple app) - imports this as a dependency
+- `horizen-pes/app/simple` (simple app) - imports this as a dependency
 - `horizen-pes-nova/runtime/wasm-go` (payment app) - imports this as a dependency
 - `horizen-pes-nova/wallet` (wallet CLI) - imports this as a dependency, bridges go-ethereum types to wasm types
+
+**Scope principle:** This library contains only code that is genuinely shared across multiple consumers. For WASM packages, that means what *any* WASM guest needs — primitive types (`Uint256`, `Address`), framework result types, memory management, and logging. The same principle applies to any new top-level domain: only extract code here when multiple projects need it. App-specific types (event schemas, account models, instruction types, report structures) stay in each app even if two apps happen to define identical types, because a different consumer may not need them at all.
 
 ## Build & Test Commands
 
 ```bash
-# Run all tests (both packages)
+# Run all tests (all packages)
 go test ./... -v
+
+# Run tests for a specific top-level domain
+go test ./wasm/... -v
 
 # Run tests for a specific package
 go test github.com/horizen-cce-common-go/wasm/types -v
@@ -33,6 +38,20 @@ Tests use `testify` (assert & require packages) with table-driven and property-b
 
 ## Architecture
 
+### Repository Layout
+
+Each top-level directory is an independent domain of shared code:
+
+```
+horizen-cce-common-go/
+├── wasm/          # WASM guest types and utilities
+│   ├── types/     # Uint256, Address, result types, helpers
+│   └── utils/     # Memory allocation, logging
+└── <future>/      # Other shared domains added here
+```
+
+New top-level directories should follow the same pattern: sub-packages grouped by concern, with their own tests.
+
 ### WASM Sandbox Design
 
 The module is completely self-contained for WASM sandbox isolation. Host ↔ Guest communication happens through JSON serialization only - no direct type imports between environments.
@@ -46,7 +65,7 @@ Host (Go runtime)          Guest (WASM module)
 
 The host uses `math/big.Int` and `go-ethereum/common.Address`; the guest uses `Uint256` and `Address`. Both serialize to identical JSON hex format (`"0x..."`). This compatibility is validated by tests in the downstream consumer (`horizen-pes/app/simple/app/app_test.go`).
 
-### Package Structure
+### WASM Package Structure
 
 **`wasm/types/`** - Core data types for WASM guest environment:
 - `Uint256` - 256-bit unsigned integer as `[4]uint64` (little-endian words), with overflow-detecting arithmetic
@@ -59,7 +78,7 @@ The host uses `math/big.Int` and `go-ethereum/common.Address`; the guest uses `U
 - `memory.go` - WASM linear memory allocation via global map (prevents GC collection), plus `BytesToPtr`/`PtrToString` for data translation
 - `logger.go` - WASI pipe logging with prefixes (`TRC`, `DBG`, `INF`, `WRN`, `ERR`)
 
-### Key Constraints
+### WASM Key Constraints
 
 - **TinyGo compilation** - Limited sync support, linear memory model
 - **Single-threaded guest** - Concurrency handled on host side
@@ -85,6 +104,27 @@ The host uses `math/big.Int` and `go-ethereum/common.Address`; the guest uses `U
 ### Go 1.22+ Loop Variable Scoping
 
 With Go 1.22+, each iteration of a `for range` loop creates a new scope. Using `:=` inside a loop body shadows outer variables — the outer variable is never updated. Use `newVar := ...; outerVar = newVar` pattern when accumulating state across iterations.
+
+### Host vs Guest Type Boundary
+
+The framework (`horizen-pes`) and the WASM apps live in separate type worlds connected only by JSON:
+
+- **Host-side types** (framework): `ethCommon.Address`, `*common.Big`, `common.Event`, `common.Withdrawal`
+- **Guest-side types** (this library): `types.Address`, `*types.Uint256`, `types.PlainEvent`, `types.Withdrawal`
+- **App-specific event types** (each app): `DepositEvent`, `SenderEvent`, `RecipientEvent`, `WithdrawalEvent` — defined locally in each WASM app's `app/types.go` using guest-side types. Host-side test code defines its own mirror types using `*common.Big` / `ethCommon.Address` for JSON deserialization of the same events.
+
+The framework never imports app-specific types. Framework test helpers (`pkg/testutil`) validate events as opaque JSON (`json.Valid()`), not by deserializing into app-specific structs. App-specific event validation belongs in each app's own system tests.
+
+### System Test Patterns
+
+All three full-flow system tests (simple app, payment app, mock runtime) follow the same sequence:
+1. **Deploy** — submit WASM bytecode, wait for state in DB + blockchain
+2. **Register keys** — user key + auditor key via `AssociateKey` requests
+3. **Deposit** — submit deposit, validate encrypted event fields + update payload signature
+4. **Withdrawal** — submit withdrawal, validate encrypted event fields + on-chain withdrawal + signature
+5. **Deanonymization report** — submit as auditor, decrypt report, validate framework envelope (`applicationId`, `requestId`), decode base64 `reportDataBytes`, verify expected account balances
+
+The deanonymization report comes **last** so it serves as a final state audit verifying the cumulative effect of all prior operations (e.g., 2 ETH deposited - 0.5 ETH withdrawn = 1.5 ETH balance in report).
 
 ### Integration Test Patterns
 

@@ -33,13 +33,7 @@ type ProcessResult struct {
 	State       []byte       `json:"state"`
 	Events      []PlainEvent `json:"events"`
 	Withdrawals []Withdrawal `json:"withdrawals"`
+	Report      []byte       `json:"report,omitempty"` // Optional deanonymization report
 	Fuel        *Uint256     `json:"fuel"`
 	Error       string       `json:"error,omitempty"`
-}
-
-// DeanonymizationResult is a local replacement for wasmCommon.DeanonymizationResult
-type DeanonymizationResult struct {
-	Report []byte   `json:"report"`
-	Fuel   *Uint256 `json:"fuel"`
-	Error  string   `json:"error,omitempty"`
 }
