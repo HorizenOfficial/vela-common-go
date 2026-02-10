@@ -1,0 +1,43 @@
+name: Horizen CCE Common Go CI
+
+on:
+  push:
+    branches: [ main, dev ]
+    tags:
+      - 'v*'       # triggers release job on any tag starting with 'v'
+
+  pull_request:
+    branches: [ main, dev ]
+
+permissions:
+  contents: write   # needed for creating releases
+  packages: read
+
+
+jobs:
+  test:
+    name: Test Suite
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Download Go dependencies
+        run: go mod download
+        working-directory: wasm
+
+      # unsafeptr check is disabled because utils/memory.go intentionally casts
+      # int32 WASM linear memory pointers to unsafe.Pointer — valid at runtime
+      # in the WASM sandbox but flagged as misuse by go vet in native 64-bit Go.
+      - name: Run go vet
+        run: go vet -unsafeptr=false ./...
+        working-directory: wasm
+
+      - name: Run tests
+        run: go test -v ./...
+        working-directory: wasm
