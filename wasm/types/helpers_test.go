@@ -213,8 +213,9 @@ func TestResultTypesJSON(t *testing.T) {
 					Amount:             NewUint256(1000000),
 				},
 			},
-			Fuel:  NewUint256(200),
-			Error: "",
+			Report: []byte("report data"),
+			Fuel:   NewUint256(200),
+			Error:  "",
 		}
 
 		data, err := json.Marshal(result)
@@ -227,19 +228,4 @@ func TestResultTypesJSON(t *testing.T) {
 		require.Equal(t, "1000000", parsed.Withdrawals[0].Amount.String())
 	})
 
-	t.Run("DeanonymizationResult", func(t *testing.T) {
-		result := DeanonymizationResult{
-			Report: []byte("report data"),
-			Fuel:   NewUint256(50),
-			Error:  "some error",
-		}
-
-		data, err := json.Marshal(result)
-		require.NoError(t, err)
-
-		var parsed DeanonymizationResult
-		err = json.Unmarshal(data, &parsed)
-		require.NoError(t, err)
-		require.Equal(t, "some error", parsed.Error)
-	})
 }
