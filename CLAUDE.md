@@ -44,6 +44,8 @@ Each top-level directory is an independent domain of shared code:
 
 ```
 horizen-cce-common-go/
+├── common/        # Shared framework types (ApplicationIdType, RequestIdType, etc.)
+├── subgraph/      # GraphQL client for The Graph subgraph
 ├── wasm/          # WASM guest types and utilities
 │   ├── types/     # Uint256, Address, result types, helpers
 │   └── utils/     # Memory allocation, logging
@@ -51,6 +53,22 @@ horizen-cce-common-go/
 ```
 
 New top-level directories should follow the same pattern: sub-packages grouped by concern, with their own tests.
+
+### Common Package Structure
+
+**`common/`** - Shared framework types used by both `horizen-pes` and `horizen-pes-nova`:
+- `ApplicationIdType` - Application identifier (`uint64`). Note: `ToHash()` method stays in `horizen-pes` (depends on go-ethereum).
+- `RequestIdType` - 32-byte request identifier with hex JSON serialization
+- `RequestResultStatus` - Request outcome enum (`RequestResultOK`, `RequestResultFailed`, `RequestResultUnknown`)
+
+### Subgraph Package Structure
+
+**`subgraph/`** - GraphQL client for querying The Graph subgraph:
+- `Client` interface - `HealthCheck`, `GetRequestCompletedByID`, `GetUserEvents`
+- `RequestCompleted`, `UserEvent` - Projection types returned by queries
+- `NewClient` - Client constructor
+- `MockClient` - Test double with builder pattern (`WithRequestCompleted`, `WithUserEvents`)
+- `ComputeSortKey` - Sort key computation for event pagination
 
 ### WASM Sandbox Design
 
