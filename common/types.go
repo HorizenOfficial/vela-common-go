@@ -10,12 +10,8 @@ import (
 // ApplicationIdType represents a unique application identifier.
 type ApplicationIdType uint64
 
-// NewApplicationId creates an ApplicationIdType from an int64 value.
-// It panics if the value is negative.
-func NewApplicationId(id int64) ApplicationIdType {
-	if id < 0 {
-		panic("ApplicationIdType cannot be negative")
-	}
+// NewApplicationId creates an ApplicationIdType from a uint64 value.
+func NewApplicationId(id uint64) ApplicationIdType {
 	return ApplicationIdType(id)
 }
 

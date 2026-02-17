@@ -10,7 +10,7 @@ Common Go utility library for the Horizen Confidential Compute Environment (HCCE
 **Downstream consumers:**
 - `horizen-pes/app/simple` (simple app) - imports this as a dependency
 - `horizen-pes-nova/runtime/wasm-go` (payment app) - imports this as a dependency
-- `horizen-pes-nova/wallet` (wallet CLI) - imports this as a dependency, bridges go-ethereum types to wasm types
+- `horizen-pes-nova/wallet` (wallet CLI) - imports this as a dependency, bridges go-ethereum types to wasm types, owns `FetchAndDecryptUserEvents` (in `cmd/user_events.go`)
 
 **Scope principle:** This library contains only code that is genuinely shared across multiple consumers. For WASM packages, that means what *any* WASM guest needs — primitive types (`Uint256`, `Address`), framework result types, memory management, and logging. The same principle applies to any new top-level domain: only extract code here when multiple projects need it. App-specific types (event schemas, account models, instruction types, report structures) stay in each app even if two apps happen to define identical types, because a different consumer may not need them at all.
 
@@ -57,7 +57,7 @@ New top-level directories should follow the same pattern: sub-packages grouped b
 ### Common Package Structure
 
 **`common/`** - Shared framework types used by both `horizen-pes` and `horizen-pes-nova`:
-- `ApplicationIdType` - Application identifier (`uint64`). Note: `ToHash()` method stays in `horizen-pes` (depends on go-ethereum).
+- `ApplicationIdType` - Application identifier (`uint64`). `horizen-pes/pkg/common` re-exports this as a type alias for backward compatibility.
 - `RequestIdType` - 32-byte request identifier with hex JSON serialization
 - `RequestResultStatus` - Request outcome enum (`RequestResultOK`, `RequestResultFailed`, `RequestResultUnknown`)
 
