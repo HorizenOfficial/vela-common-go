@@ -10,7 +10,7 @@ Common Go utility library for the Horizen Confidential Compute Environment (HCCE
 **Downstream consumers:**
 - `horizen-pes/app/simple` (simple app) - imports this as a dependency
 - `horizen-pes-nova/runtime/wasm-go` (payment app) - imports this as a dependency
-- `horizen-pes-nova/wallet` (wallet CLI) - imports this as a dependency, bridges go-ethereum types to wasm types
+- `horizen-pes-nova/wallet` (wallet CLI) - imports this as a dependency, bridges go-ethereum types to wasm types, owns `FetchAndDecryptUserEvents` (in `cmd/user_events.go`)
 
 **Scope principle:** This library contains only code that is genuinely shared across multiple consumers. For WASM packages, that means what *any* WASM guest needs — primitive types (`Uint256`, `Address`), framework result types, memory management, and logging. The same principle applies to any new top-level domain: only extract code here when multiple projects need it. App-specific types (event schemas, account models, instruction types, report structures) stay in each app even if two apps happen to define identical types, because a different consumer may not need them at all.
 
@@ -44,6 +44,8 @@ Each top-level directory is an independent domain of shared code:
 
 ```
 horizen-cce-common-go/
+├── common/        # Shared framework types (ApplicationIdType, RequestIdType, etc.)
+├── subgraph/      # GraphQL client for The Graph subgraph
 ├── wasm/          # WASM guest types and utilities
 │   ├── types/     # Uint256, Address, result types, helpers
 │   └── utils/     # Memory allocation, logging
@@ -51,6 +53,22 @@ horizen-cce-common-go/
 ```
 
 New top-level directories should follow the same pattern: sub-packages grouped by concern, with their own tests.
+
+### Common Package Structure
+
+**`common/`** - Shared framework types used by both `horizen-pes` and `horizen-pes-nova`:
+- `ApplicationIdType` - Application identifier (`uint64`). `NewApplicationId` takes `uint64`. `horizen-pes/pkg/common` re-exports this as a type alias for backward compatibility.
+- `RequestIdType` - 32-byte request identifier with hex JSON serialization
+- `RequestResultStatus` - Request outcome enum (`RequestResultOK`, `RequestResultFailed`, `RequestResultUnknown`)
+
+### Subgraph Package Structure
+
+**`subgraph/`** - GraphQL client for querying The Graph subgraph:
+- `Client` interface - `HealthCheck`, `GetRequestCompletedByID`, `GetUserEvents`
+- `RequestCompleted`, `UserEvent` - Projection types returned by queries
+- `NewClient` - Client constructor
+- `MockClient` - Test double with builder pattern (`WithRequestCompleted`, `WithUserEvents`)
+- `ComputeSortKey` - Sort key computation for event pagination
 
 ### WASM Sandbox Design
 
@@ -100,6 +118,7 @@ The host uses `math/big.Int` and `go-ethereum/common.Address`; the guest uses `U
 - **Overflow-aware API** - Arithmetic methods come in pairs: `Add`/`AddOverflow`, `Sub`/`SubOverflow`, `Mul64`/`Mul64Overflow`, `Add64`/`Add64Overflow`. The downstream consumer relies on overflow detection for financial safety.
 - **Naming** - Use Go camelCase for all variables and return values (no snake_case). Use `LogWarn`/`LogError` from `utils` instead of `println` for all diagnostic output.
 - **WASM exports** - Guest modules should export `get_memory_stats` (returning `MemoryStats` via `SerializeAndWriteResult`) to enable memory leak detection in integration tests.
+- **WASM ABI boundary** - WASM has no unsigned integer types; `i32`/`i64` are just 32/64 bits with signedness only in operations. The host passes `ApplicationIdType` (`uint64`) as `int64` via `ToWasmType()` — a bit-preserving reinterpret cast. Guest exports receive `int64` and cast back with `uint64(appId)`. This round-trip preserves the full `uint64` range including values above `MaxInt64`.
 
 ### Go 1.22+ Loop Variable Scoping
 
