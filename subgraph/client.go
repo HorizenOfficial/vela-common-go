@@ -292,10 +292,10 @@ func parseRequestID(hexString string) (common.RequestIdType, error) {
 }
 
 func decodeHex(hexString string) ([]byte, error) {
-	trimmed := strings.TrimPrefix(hexString, "0x")
-	if trimmed == "" {
+	if hexString == "" {
 		return nil, nil
 	}
+	trimmed := strings.TrimPrefix(hexString, "0x")
 	return hex.DecodeString(trimmed)
 }
 

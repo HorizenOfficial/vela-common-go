@@ -57,7 +57,7 @@ New top-level directories should follow the same pattern: sub-packages grouped b
 ### Common Package Structure
 
 **`common/`** - Shared framework types used by both `horizen-pes` and `horizen-pes-nova`:
-- `ApplicationIdType` - Application identifier (`uint64`). `horizen-pes/pkg/common` re-exports this as a type alias for backward compatibility.
+- `ApplicationIdType` - Application identifier (`uint64`). `NewApplicationId` takes `uint64`. `horizen-pes/pkg/common` re-exports this as a type alias for backward compatibility.
 - `RequestIdType` - 32-byte request identifier with hex JSON serialization
 - `RequestResultStatus` - Request outcome enum (`RequestResultOK`, `RequestResultFailed`, `RequestResultUnknown`)
 
@@ -118,6 +118,7 @@ The host uses `math/big.Int` and `go-ethereum/common.Address`; the guest uses `U
 - **Overflow-aware API** - Arithmetic methods come in pairs: `Add`/`AddOverflow`, `Sub`/`SubOverflow`, `Mul64`/`Mul64Overflow`, `Add64`/`Add64Overflow`. The downstream consumer relies on overflow detection for financial safety.
 - **Naming** - Use Go camelCase for all variables and return values (no snake_case). Use `LogWarn`/`LogError` from `utils` instead of `println` for all diagnostic output.
 - **WASM exports** - Guest modules should export `get_memory_stats` (returning `MemoryStats` via `SerializeAndWriteResult`) to enable memory leak detection in integration tests.
+- **WASM ABI boundary** - WASM has no unsigned integer types; `i32`/`i64` are just 32/64 bits with signedness only in operations. The host passes `ApplicationIdType` (`uint64`) as `int64` via `ToWasmType()` — a bit-preserving reinterpret cast. Guest exports receive `int64` and cast back with `uint64(appId)`. This round-trip preserves the full `uint64` range including values above `MaxInt64`.
 
 ### Go 1.22+ Loop Variable Scoping
 

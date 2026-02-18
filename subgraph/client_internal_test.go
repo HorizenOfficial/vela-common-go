@@ -75,11 +75,13 @@ func TestDecodeHex_Empty(t *testing.T) {
 	assert.Nil(t, result)
 }
 
-// TestDecodeHex_Only0x returns nil when the string is just the 0x prefix.
+// TestDecodeHex_Only0x returns an empty byte slice (not nil) when the string
+// is just the 0x prefix, since "0x" is the canonical encoding of empty bytes.
 func TestDecodeHex_Only0x(t *testing.T) {
 	result, err := decodeHex("0x")
 	require.NoError(t, err)
-	assert.Nil(t, result)
+	assert.NotNil(t, result)
+	assert.Empty(t, result)
 }
 
 // TestDecodeHex_Invalid rejects non-hex characters.
