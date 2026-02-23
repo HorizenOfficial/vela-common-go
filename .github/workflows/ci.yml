@@ -29,15 +29,15 @@ jobs:
 
       - name: Download Go dependencies
         run: go mod download
-        working-directory: wasm
+        working-directory: .
 
       # unsafeptr check is disabled because utils/memory.go intentionally casts
       # int32 WASM linear memory pointers to unsafe.Pointer — valid at runtime
       # in the WASM sandbox but flagged as misuse by go vet in native 64-bit Go.
       - name: Run go vet
         run: go vet -unsafeptr=false ./...
-        working-directory: wasm
+        working-directory: .
 
       - name: Run tests
         run: go test -v ./...
-        working-directory: wasm
+        working-directory: .

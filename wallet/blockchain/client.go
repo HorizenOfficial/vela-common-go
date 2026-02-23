@@ -137,7 +137,7 @@ func (c *BlockChainClient) unpackProcessorEndpointError(chainErr error) error {
 		return fmt.Errorf("call returned unknown error: %w", chainErr)
 	}
 
-	return fmt.Errorf("contract revert: %T", rawUnpackedErr)
+	return fmt.Errorf("contract revert (%T): %+v", rawUnpackedErr, rawUnpackedErr)
 }
 
 func (c *BlockChainClient) SubmitRequest(ctx context.Context, protocolVersion uint8, applicationID common.ApplicationIdType, requestType common.RequestType, payload []byte, depositAmount *big.Int, maxFeeValue *big.Int) (common.RequestIdType, uint64, error) {
@@ -181,6 +181,9 @@ func (c *BlockChainClient) SubmitRequest(ctx context.Context, protocolVersion ui
 	}
 	if receipt.Status != 1 {
 		return common.RequestIdType{}, 0, fmt.Errorf("transaction failed")
+	}
+	if receipt.BlockNumber == nil {
+		return common.RequestIdType{}, 0, fmt.Errorf("receipt missing block number")
 	}
 
 	for _, vLog := range receipt.Logs {
