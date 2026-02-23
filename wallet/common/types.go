@@ -57,3 +57,28 @@ const (
 	RequestResultFailed
 	RequestResultUnknown
 )
+
+// RequestType represents the type of request submitted by app-side clients.
+type RequestType uint8
+
+const (
+	Deploy RequestType = iota
+	Process
+	Deanonymize
+	AssociateKey
+)
+
+func (rt RequestType) String() string {
+	switch rt {
+	case Deploy:
+		return "deploy"
+	case Process:
+		return "process"
+	case Deanonymize:
+		return "deanonymize"
+	case AssociateKey:
+		return "associatekey"
+	default:
+		return "unknown"
+	}
+}

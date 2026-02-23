@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Common Go utility library for the Horizen Confidential Compute Environment (HCCE). Contains shared types and utilities used across the Horizen blockchain system. Each top-level directory groups a domain of common code (e.g., `wasm/` for WebAssembly guest support). New domains are added as sibling directories at the same level as `wasm/`.
+Common Go utility library for the Horizen Confidential Compute Environment (HCCE). Contains shared types and utilities used across the Horizen blockchain system. Wallet/app-side packages live under `wallet/` (e.g., `wallet/common`, `wallet/subgraph`, `wallet/blockchain`). The `wasm/` domain stays separate for guest-side shared code.
 
 **Origin:** Migrated from `horizen-pes/nova` repository as a shared library.
 **Downstream consumers:**
@@ -40,30 +40,31 @@ Tests use `testify` (assert & require packages) with table-driven and property-b
 
 ### Repository Layout
 
-Each top-level directory is an independent domain of shared code:
+Top-level domains in this repository:
 
 ```
 horizen-cce-common-go/
-├── common/        # Shared framework types (ApplicationIdType, RequestIdType, etc.)
-├── subgraph/      # GraphQL client for The Graph subgraph
+├── wallet/
+│   ├── common/    # Shared wallet/app-side types (ApplicationIdType, RequestIdType, RequestType, etc.)
+│   ├── subgraph/  # GraphQL client for The Graph subgraph
+│   └── blockchain/# App-side blockchain client (submit + tee key reads)
 ├── wasm/          # WASM guest types and utilities
 │   ├── types/     # Uint256, Address, result types, helpers
 │   └── utils/     # Memory allocation, logging
-└── <future>/      # Other shared domains added here
 ```
 
-New top-level directories should follow the same pattern: sub-packages grouped by concern, with their own tests.
+Keep wallet/app-side shared functionality under `wallet/`; keep WASM guest shared functionality under `wasm/`.
 
 ### Common Package Structure
 
-**`common/`** - Shared framework types used by both `horizen-pes` and `horizen-pes-nova`:
+**`wallet/common/`** - Shared wallet/app-side framework types used by both `horizen-pes` and `horizen-pes-nova`:
 - `ApplicationIdType` - Application identifier (`uint64`). `NewApplicationId` takes `uint64`. `horizen-pes/pkg/common` re-exports this as a type alias for backward compatibility.
 - `RequestIdType` - 32-byte request identifier with hex JSON serialization
 - `RequestResultStatus` - Request outcome enum (`RequestResultOK`, `RequestResultFailed`, `RequestResultUnknown`)
 
 ### Subgraph Package Structure
 
-**`subgraph/`** - GraphQL client for querying The Graph subgraph:
+**`wallet/subgraph/`** - GraphQL client for querying The Graph subgraph:
 - `Client` interface - `HealthCheck`, `GetRequestCompletedByID`, `GetUserEvents`
 - `RequestCompleted`, `UserEvent` - Projection types returned by queries
 - `NewClient` - Client constructor

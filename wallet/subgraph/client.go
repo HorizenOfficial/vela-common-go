@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/horizen-cce-common-go/common"
+	"github.com/horizen-cce-common-go/wallet/common"
 )
 
 type graphError struct {

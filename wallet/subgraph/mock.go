@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/horizen-cce-common-go/common"
+	"github.com/horizen-cce-common-go/wallet/common"
 )
 
 // MockClient provides canned responses for tests.

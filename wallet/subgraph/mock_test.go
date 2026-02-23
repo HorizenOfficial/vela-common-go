@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/horizen-cce-common-go/common"
+	"github.com/horizen-cce-common-go/wallet/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
