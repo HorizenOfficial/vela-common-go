@@ -167,9 +167,10 @@ func (c *BlockChainClient) SubmitRequest(ctx context.Context, protocolVersion ui
 		maxFeeValue,
 	)
 
-	c.account.Value = new(big.Int).Add(depositAmount, maxFeeValue)
-	tx, err := bind.Transact(c.processorBoundContract, c.account, data)
-	c.account.Value = nil
+	// Clone opts per request to avoid mutating shared state across concurrent submissions.
+	txOpts := *c.account
+	txOpts.Value = new(big.Int).Add(depositAmount, maxFeeValue)
+	tx, err := bind.Transact(c.processorBoundContract, &txOpts, data)
 	if err != nil {
 		return common.RequestIdType{}, 0, fmt.Errorf("failed to submit transaction: %w", c.unpackProcessorEndpointError(err))
 	}
