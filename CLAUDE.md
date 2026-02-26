@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Common Go utility library for the Horizen Confidential Compute Environment (HCCE). Contains shared types and utilities used across the Horizen blockchain system. Each top-level directory groups a domain of common code (e.g., `wasm/` for WebAssembly guest support). New domains are added as sibling directories at the same level as `wasm/`.
+Common Go utility library for Horizen Vela. Contains shared types and utilities used across the Horizen blockchain system. Each top-level directory groups a domain of common code (e.g., `wasm/` for WebAssembly guest support). New domains are added as sibling directories at the same level as `wasm/`.
 
 **Origin:** Migrated from `horizen-pes/nova` repository as a shared library.
 **Downstream consumers:**
