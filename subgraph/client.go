@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/vela-common-go/common"
+	"github.com/HorizenOfficial/vela-common-go/common"
 )
 
 type graphError struct {

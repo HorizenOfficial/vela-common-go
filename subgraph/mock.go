@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/vela-common-go/common"
+	"github.com/HorizenOfficial/vela-common-go/common"
 )
 
 // MockClient provides canned responses for tests.

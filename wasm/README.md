@@ -52,8 +52,8 @@ Import the module in your WASM guest application:
 
 ```go
 import (
-    "github.com/vela-common-go/wasm/types"
-    "github.com/vela-common-go/wasm/utils"
+    "github.com/HorizenOfficial/vela-common-go/wasm/types"
+    "github.com/HorizenOfficial/vela-common-go/wasm/utils"
 )
 ```
 
@@ -106,11 +106,11 @@ func processRequest(payloadPtr *byte, payloadLen int32) *byte {
 
 ```bash
 # Run all tests
-go test github.com/vela-common-go/wasm/types -v
-go test github.com/vela-common-go/wasm/utils -v
+go test github.com/HorizenOfficial/vela-common-go/wasm/types -v
+go test github.com/HorizenOfficial/vela-common-go/wasm/utils -v
 
 # Run a single test
-go test github.com/vela-common-go/wasm/types -run TestUint256Add
+go test github.com/HorizenOfficial/vela-common-go/wasm/types -run TestUint256Add
 ```
 
 Tests use `testify` with table-driven and property-based patterns. Random tests use fixed seeds for CI reproducibility.
