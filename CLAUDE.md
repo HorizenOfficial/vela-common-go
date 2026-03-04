@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Common Go utility library for Horizen Vela. Contains shared types and utilities used across the Horizen blockchain system. Each top-level directory groups a domain of common code (e.g., `wasm/` for WebAssembly guest support). New domains are added as sibling directories at the same level as `wasm/`.
 
-**Origin:** Migrated from `vela/nova` repository as a shared library.
+**Origin:** Migrated from `vela-nova` repository as a shared library.
 **Downstream consumers:**
 - `vela/app/simple` (simple app) - imports this as a dependency
 - `vela-nova/runtime/wasm-go` (payment app) - imports this as a dependency
