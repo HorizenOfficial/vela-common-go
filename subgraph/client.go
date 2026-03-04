@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/horizen-cce-common-go/common"
+	"github.com/HorizenOfficial/vela-common-go/common"
 )
 
 type graphError struct {
@@ -299,7 +299,7 @@ func decodeHex(hexString string) ([]byte, error) {
 	return hex.DecodeString(trimmed)
 }
 
-// Unexported helpers inlined from horizen-pes/pkg/common/utils.go.
+// Unexported helpers inlined from vela/pkg/common/utils.go.
 
 func uint8ToRequestResultStatus(i uint8) (common.RequestResultStatus, error) {
 	switch i {

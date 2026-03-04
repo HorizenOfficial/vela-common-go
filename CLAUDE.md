@@ -6,11 +6,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Common Go utility library for Horizen Vela. Contains shared types and utilities used across the Horizen blockchain system. Each top-level directory groups a domain of common code (e.g., `wasm/` for WebAssembly guest support). New domains are added as sibling directories at the same level as `wasm/`.
 
-**Origin:** Migrated from `horizen-pes/nova` repository as a shared library.
+**Origin:** Migrated from `vela/nova` repository as a shared library.
 **Downstream consumers:**
-- `horizen-pes/app/simple` (simple app) - imports this as a dependency
-- `horizen-pes-nova/runtime/wasm-go` (payment app) - imports this as a dependency
-- `horizen-pes-nova/wallet` (wallet CLI) - imports this as a dependency, bridges go-ethereum types to wasm types, owns `FetchAndDecryptUserEvents` (in `cmd/user_events.go`)
+- `vela/app/simple` (simple app) - imports this as a dependency
+- `vela-nova/runtime/wasm-go` (payment app) - imports this as a dependency
+- `vela-nova/wallet` (wallet CLI) - imports this as a dependency, bridges go-ethereum types to wasm types, owns `FetchAndDecryptUserEvents` (in `cmd/user_events.go`)
 
 **Scope principle:** This library contains only code that is genuinely shared across multiple consumers. For WASM packages, that means what *any* WASM guest needs — primitive types (`Uint256`, `Address`), framework result types, memory management, and logging. The same principle applies to any new top-level domain: only extract code here when multiple projects need it. App-specific types (event schemas, account models, instruction types, report structures) stay in each app even if two apps happen to define identical types, because a different consumer may not need them at all.
 
@@ -24,11 +24,11 @@ go test ./... -v
 go test ./wasm/... -v
 
 # Run tests for a specific package
-go test github.com/horizen-cce-common-go/wasm/types -v
-go test github.com/horizen-cce-common-go/wasm/utils -v
+go test github.com/HorizenOfficial/vela-common-go/wasm/types -v
+go test github.com/HorizenOfficial/vela-common-go/wasm/utils -v
 
 # Run a single test
-go test github.com/horizen-cce-common-go/wasm/types -run TestAdd64Overflow
+go test github.com/HorizenOfficial/vela-common-go/wasm/types -run TestAdd64Overflow
 
 # Manage dependencies
 go mod tidy
@@ -43,7 +43,7 @@ Tests use `testify` (assert & require packages) with table-driven and property-b
 Each top-level directory is an independent domain of shared code:
 
 ```
-horizen-cce-common-go/
+vela-common-go/
 ├── common/        # Shared framework types (ApplicationIdType, RequestIdType, etc.)
 ├── subgraph/      # GraphQL client for The Graph subgraph
 ├── wasm/          # WASM guest types and utilities
@@ -56,8 +56,8 @@ New top-level directories should follow the same pattern: sub-packages grouped b
 
 ### Common Package Structure
 
-**`common/`** - Shared framework types used by both `horizen-pes` and `horizen-pes-nova`:
-- `ApplicationIdType` - Application identifier (`uint64`). `NewApplicationId` takes `uint64`. `horizen-pes/pkg/common` re-exports this as a type alias for backward compatibility.
+**`common/`** - Shared framework types used by both `vela` and `vela-nova`:
+- `ApplicationIdType` - Application identifier (`uint64`). `NewApplicationId` takes `uint64`. `vela/pkg/common` re-exports this as a type alias for backward compatibility.
 - `RequestIdType` - 32-byte request identifier with hex JSON serialization
 - `RequestResultStatus` - Request outcome enum (`RequestResultOK`, `RequestResultFailed`, `RequestResultUnknown`)
 
@@ -81,7 +81,7 @@ Host (Go runtime)          Guest (WASM module)
      |  <-- JSON bytes ---        |
 ```
 
-The host uses `math/big.Int` and `go-ethereum/common.Address`; the guest uses `Uint256` and `Address`. Both serialize to identical JSON hex format (`"0x..."`). This compatibility is validated by tests in the downstream consumer (`horizen-pes/app/simple/app/app_test.go`).
+The host uses `math/big.Int` and `go-ethereum/common.Address`; the guest uses `Uint256` and `Address`. Both serialize to identical JSON hex format (`"0x..."`). This compatibility is validated by tests in the downstream consumer (`vela/app/simple/app/app_test.go`).
 
 ### WASM Package Structure
 
@@ -126,7 +126,7 @@ With Go 1.22+, each iteration of a `for range` loop creates a new scope. Using `
 
 ### Host vs Guest Type Boundary
 
-The framework (`horizen-pes`) and the WASM apps live in separate type worlds connected only by JSON:
+The framework (`vela`) and the WASM apps live in separate type worlds connected only by JSON:
 
 - **Host-side types** (framework): `ethCommon.Address`, `*common.Big`, `common.Event`, `common.Withdrawal`
 - **Guest-side types** (this library): `types.Address`, `*types.Uint256`, `types.PlainEvent`, `types.Withdrawal`

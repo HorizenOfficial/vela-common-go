@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"unsafe"
 
-	"github.com/horizen-cce-common-go/wasm/utils"
+	"github.com/HorizenOfficial/vela-common-go/wasm/utils"
 )
 
 // SerializeAndWriteResult handles common serialization and returns a WASM pointer.

@@ -1,6 +1,6 @@
-# horizen-cce-common-go/wasm
+# vela-common-go/wasm
 
-Common Go library for WebAssembly (WASM) guest modules running within the Horizen Confidential Compute Environment (HCCE).
+Common Go library for Horizen Vela.
 
 Provides shared types and utilities that WASM guest applications use to communicate with the host runtime. Compiled with [TinyGo](https://tinygo.org/) to target `wasm32-wasi`.
 
@@ -52,8 +52,8 @@ Import the module in your WASM guest application:
 
 ```go
 import (
-    "github.com/horizen-cce-common-go/wasm/types"
-    "github.com/horizen-cce-common-go/wasm/utils"
+    "github.com/HorizenOfficial/vela-common-go/wasm/types"
+    "github.com/HorizenOfficial/vela-common-go/wasm/utils"
 )
 ```
 
@@ -106,16 +106,16 @@ func processRequest(payloadPtr *byte, payloadLen int32) *byte {
 
 ```bash
 # Run all tests
-go test github.com/horizen-cce-common-go/wasm/types -v
-go test github.com/horizen-cce-common-go/wasm/utils -v
+go test github.com/HorizenOfficial/vela-common-go/wasm/types -v
+go test github.com/HorizenOfficial/vela-common-go/wasm/utils -v
 
 # Run a single test
-go test github.com/horizen-cce-common-go/wasm/types -run TestUint256Add
+go test github.com/HorizenOfficial/vela-common-go/wasm/types -run TestUint256Add
 ```
 
 Tests use `testify` with table-driven and property-based patterns. Random tests use fixed seeds for CI reproducibility.
 
-Note: functions that involve 32-bit WASM pointer arithmetic (`BytesToPtr`, `SerializeAndWriteResult`) cannot be unit-tested in native 64-bit Go. They are exercised through integration tests in the downstream consumers (e.g., `horizen-pes/app/simple/integration_test.go`) that compile to WASM and validate the full `allocate` → `BytesToPtr` → `extractResultBytes` → `deallocate` round-trip.
+Note: functions that involve 32-bit WASM pointer arithmetic (`BytesToPtr`, `SerializeAndWriteResult`) cannot be unit-tested in native 64-bit Go. They are exercised through integration tests in the downstream consumers (e.g., `vela/app/simple/integration_test.go`) that compile to WASM and validate the full `allocate` → `BytesToPtr` → `extractResultBytes` → `deallocate` round-trip.
 
 ## Constraints
 
