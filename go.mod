@@ -1,4 +1,4 @@
-module github.com/horizen-cce-common-go
+module github.com/vela-common-go
 
 go 1.24.0
 

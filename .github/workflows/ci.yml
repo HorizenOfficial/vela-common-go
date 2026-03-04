@@ -1,4 +1,4 @@
-name: Horizen CCE Common Go CI
+name: Vela Common Go CI
 
 on:
   push:

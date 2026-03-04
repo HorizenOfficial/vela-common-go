@@ -4,7 +4,7 @@ import (
 	"context"
 	"math/big"
 
-	"github.com/horizen-cce-common-go/common"
+	"github.com/vela-common-go/common"
 )
 
 // Client defines the subgraph operations used by the services.
