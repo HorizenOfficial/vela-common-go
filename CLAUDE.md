@@ -24,11 +24,11 @@ go test ./... -v
 go test ./wasm/... -v
 
 # Run tests for a specific package
-go test github.com/HorizenOfficial/vela-common-go/wasm/types -v
-go test github.com/HorizenOfficial/vela-common-go/wasm/utils -v
+go test github.com/vela-common-go/wasm/types -v
+go test github.com/vela-common-go/wasm/utils -v
 
 # Run a single test
-go test github.com/HorizenOfficial/vela-common-go/wasm/types -run TestAdd64Overflow
+go test github.com/vela-common-go/wasm/types -run TestAdd64Overflow
 
 # Manage dependencies
 go mod tidy
