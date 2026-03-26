@@ -375,6 +375,59 @@ func TestClient_GetUserEvents_ParsesResponse(t *testing.T) {
 	assert.Equal(t, expectedReqID, ev.RequestID)
 }
 
+// TestClient_GetUserEventsBySubTypes_ParsesResponse verifies that the client
+// correctly builds the eventSubType_in filter and parses the response.
+func TestClient_GetUserEventsBySubTypes_ParsesResponse(t *testing.T) {
+	srv := fakeSubgraph(t, 200, map[string]interface{}{
+		"data": map[string]interface{}{
+			"userEvents": []map[string]interface{}{
+				{
+					"applicationId": "1",
+					"requestId":     "0x0000000000000000000000000000000000000000000000000000000000000001",
+					"eventSubType":  "0xaabbcc",
+					"encryptedData": "0xcafe",
+					"blockNumber":   "100",
+					"logIndex":      "3",
+					"sortKey":       "100000000000003",
+				},
+				{
+					"applicationId": "1",
+					"requestId":     "0x0000000000000000000000000000000000000000000000000000000000000002",
+					"eventSubType":  "0xddeeff",
+					"encryptedData": "0xbeef",
+					"blockNumber":   "101",
+					"logIndex":      "0",
+					"sortKey":       "101000000000000",
+				},
+			},
+		},
+	})
+
+	c := NewClient(srv.URL)
+	appID := common.NewApplicationId(1)
+	events, err := c.GetUserEventsBySubTypes(context.Background(), appID, []string{"0xaabbcc", "0xddeeff"}, 10, nil)
+	require.NoError(t, err)
+	require.Len(t, events, 2)
+
+	assert.Equal(t, "0xaabbcc", events[0].EventSubType)
+	assert.Equal(t, "0xddeeff", events[1].EventSubType)
+}
+
+// TestClient_GetUserEventsBySubTypes_Empty verifies that an empty subtype
+// list returns all events (no eventSubType filter applied).
+func TestClient_GetUserEventsBySubTypes_Empty(t *testing.T) {
+	srv := fakeSubgraph(t, 200, map[string]interface{}{
+		"data": map[string]interface{}{
+			"userEvents": []map[string]interface{}{},
+		},
+	})
+
+	c := NewClient(srv.URL)
+	events, err := c.GetUserEventsBySubTypes(context.Background(), common.NewApplicationId(1), nil, 10, nil)
+	require.NoError(t, err)
+	assert.Empty(t, events)
+}
+
 // TestClient_GetUserEvents_Empty verifies that an empty result set returns
 // an empty slice without error.
 func TestClient_GetUserEvents_Empty(t *testing.T) {
