@@ -11,20 +11,29 @@ import (
 
 // MockClient provides canned responses for tests.
 type MockClient struct {
-	requests map[common.RequestIdType]*RequestCompleted
-	events   map[common.ApplicationIdType][]UserEvent
+	requests       map[common.RequestIdType]*RequestCompleted
+	deployRequests map[common.RequestIdType]*RequestCompleted
+	events         map[common.ApplicationIdType][]UserEvent
 }
 
 func NewMockClient() *MockClient {
 	return &MockClient{
-		requests: make(map[common.RequestIdType]*RequestCompleted),
-		events:   make(map[common.ApplicationIdType][]UserEvent),
+		requests:       make(map[common.RequestIdType]*RequestCompleted),
+		deployRequests: make(map[common.RequestIdType]*RequestCompleted),
+		events:         make(map[common.ApplicationIdType][]UserEvent),
 	}
 }
 
 func (m *MockClient) WithRequestCompleted(rc *RequestCompleted) *MockClient {
 	if rc != nil {
 		m.requests[rc.RequestID] = rc
+	}
+	return m
+}
+
+func (m *MockClient) WithDeployRequestCompleted(rc *RequestCompleted) *MockClient {
+	if rc != nil {
+		m.deployRequests[rc.RequestID] = rc
 	}
 	return m
 }
@@ -36,6 +45,13 @@ func (m *MockClient) WithUserEvents(appID common.ApplicationIdType, events []Use
 
 func (m *MockClient) GetRequestCompletedByID(_ context.Context, requestID common.RequestIdType) (*RequestCompleted, error) {
 	if rc, ok := m.requests[requestID]; ok {
+		return rc, nil
+	}
+	return nil, nil
+}
+
+func (m *MockClient) GetDeployRequestCompletedByID(_ context.Context, requestID common.RequestIdType) (*RequestCompleted, error) {
+	if rc, ok := m.deployRequests[requestID]; ok {
 		return rc, nil
 	}
 	return nil, nil

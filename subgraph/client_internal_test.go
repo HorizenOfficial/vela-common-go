@@ -272,6 +272,7 @@ func TestClient_GetRequestCompletedByID_Found(t *testing.T) {
 		"data": map[string]interface{}{
 			"requestCompleteds": []map[string]interface{}{
 				{
+					"applicationId":   "7",
 					"requestId":       "0x0000000000000000000000000000000000000000000000000000000000000001",
 					"status":          "0",
 					"errorCode":       "0",
@@ -287,6 +288,7 @@ func TestClient_GetRequestCompletedByID_Found(t *testing.T) {
 	rc, err := c.GetRequestCompletedByID(context.Background(), reqID)
 	require.NoError(t, err)
 	require.NotNil(t, rc)
+	assert.Equal(t, common.NewApplicationId(7), rc.ApplicationID)
 	assert.Equal(t, reqID, rc.RequestID)
 	assert.Equal(t, common.RequestResultOK, rc.Status)
 	assert.Equal(t, uint8(0), rc.ErrorCode)
@@ -336,6 +338,113 @@ func TestClient_GetRequestCompletedByID_FailedStatus(t *testing.T) {
 	assert.Equal(t, common.RequestResultFailed, rc.Status)
 	assert.Equal(t, uint8(5), rc.ErrorCode)
 	assert.Equal(t, "something went wrong", rc.ErrorMessage)
+}
+
+// TestClient_GetRequestCompletedByID_MissingApplicationID verifies that a
+// response without applicationId defaults to zero (backward compatibility).
+func TestClient_GetRequestCompletedByID_MissingApplicationID(t *testing.T) {
+	var reqID common.RequestIdType
+	reqID[31] = 1
+
+	srv := fakeSubgraph(t, 200, map[string]interface{}{
+		"data": map[string]interface{}{
+			"requestCompleteds": []map[string]interface{}{
+				{
+					"requestId":       "0x0000000000000000000000000000000000000000000000000000000000000001",
+					"status":          "0",
+					"errorCode":       "0",
+					"errorMessage":    "",
+					"applicationFees": "0",
+					"blockNumber":     "1",
+				},
+			},
+		},
+	})
+
+	c := NewClient(srv.URL)
+	rc, err := c.GetRequestCompletedByID(context.Background(), reqID)
+	require.NoError(t, err)
+	require.NotNil(t, rc)
+	assert.Equal(t, common.ApplicationIdType(0), rc.ApplicationID)
+}
+
+// TestClient_GetDeployRequestCompletedByID_Found verifies successful parsing
+// of a DeployRequestCompleted entity from the subgraph response.
+func TestClient_GetDeployRequestCompletedByID_Found(t *testing.T) {
+	var reqID common.RequestIdType
+	reqID[31] = 2
+
+	srv := fakeSubgraph(t, 200, map[string]interface{}{
+		"data": map[string]interface{}{
+			"deployRequestCompleteds": []map[string]interface{}{
+				{
+					"applicationId":   "42",
+					"requestId":       "0x0000000000000000000000000000000000000000000000000000000000000002",
+					"status":          "0",
+					"errorCode":       "0",
+					"errorMessage":    "",
+					"applicationFees": "500",
+					"blockNumber":     "99",
+				},
+			},
+		},
+	})
+
+	c := NewClient(srv.URL)
+	rc, err := c.GetDeployRequestCompletedByID(context.Background(), reqID)
+	require.NoError(t, err)
+	require.NotNil(t, rc)
+	assert.Equal(t, common.NewApplicationId(42), rc.ApplicationID)
+	assert.Equal(t, reqID, rc.RequestID)
+	assert.Equal(t, common.RequestResultOK, rc.Status)
+	assert.Equal(t, big.NewInt(500), rc.ApplicationFees)
+	assert.Equal(t, uint64(99), rc.BlockNumber)
+}
+
+// TestClient_GetDeployRequestCompletedByID_NotFound verifies that an empty
+// result set returns nil without error.
+func TestClient_GetDeployRequestCompletedByID_NotFound(t *testing.T) {
+	srv := fakeSubgraph(t, 200, map[string]interface{}{
+		"data": map[string]interface{}{
+			"deployRequestCompleteds": []map[string]interface{}{},
+		},
+	})
+
+	c := NewClient(srv.URL)
+	rc, err := c.GetDeployRequestCompletedByID(context.Background(), common.RequestIdType{})
+	require.NoError(t, err)
+	assert.Nil(t, rc)
+}
+
+// TestClient_GetDeployRequestCompletedByID_FailedStatus verifies that
+// status=1 is mapped to RequestResultFailed with error details.
+func TestClient_GetDeployRequestCompletedByID_FailedStatus(t *testing.T) {
+	srv := fakeSubgraph(t, 200, map[string]interface{}{
+		"data": map[string]interface{}{
+			"deployRequestCompleteds": []map[string]interface{}{
+				{
+					"applicationId":   "10",
+					"requestId":       "0x0000000000000000000000000000000000000000000000000000000000000001",
+					"status":          "1",
+					"errorCode":       "3",
+					"errorMessage":    "deploy failed",
+					"applicationFees": "0",
+					"blockNumber":     "50",
+				},
+			},
+		},
+	})
+
+	c := NewClient(srv.URL)
+	var reqID common.RequestIdType
+	reqID[31] = 1
+	rc, err := c.GetDeployRequestCompletedByID(context.Background(), reqID)
+	require.NoError(t, err)
+	require.NotNil(t, rc)
+	assert.Equal(t, common.NewApplicationId(10), rc.ApplicationID)
+	assert.Equal(t, common.RequestResultFailed, rc.Status)
+	assert.Equal(t, uint8(3), rc.ErrorCode)
+	assert.Equal(t, "deploy failed", rc.ErrorMessage)
 }
 
 // TestClient_GetUserEvents_ParsesResponse verifies that the client correctly

@@ -52,6 +52,44 @@ func TestMockClient_WithRequestCompleted_Nil(t *testing.T) {
 	assert.Nil(t, rc)
 }
 
+// TestMockClient_GetDeployRequestCompleted_NotFound verifies that querying
+// for an unknown deploy request ID returns nil without error.
+func TestMockClient_GetDeployRequestCompleted_NotFound(t *testing.T) {
+	m := NewMockClient()
+	rc, err := m.GetDeployRequestCompletedByID(context.Background(), common.RequestIdType{})
+	require.NoError(t, err)
+	assert.Nil(t, rc)
+}
+
+// TestMockClient_GetDeployRequestCompleted_Found verifies that a registered
+// DeployRequestCompleted is returned for the matching request ID.
+func TestMockClient_GetDeployRequestCompleted_Found(t *testing.T) {
+	var reqID common.RequestIdType
+	reqID[31] = 5
+
+	rc := &RequestCompleted{
+		ApplicationID: common.NewApplicationId(42),
+		RequestID:     reqID,
+		Status:        common.RequestResultOK,
+	}
+	m := NewMockClient().WithDeployRequestCompleted(rc)
+
+	result, err := m.GetDeployRequestCompletedByID(context.Background(), reqID)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Equal(t, common.NewApplicationId(42), result.ApplicationID)
+	assert.Equal(t, common.RequestResultOK, result.Status)
+}
+
+// TestMockClient_WithDeployRequestCompleted_Nil verifies that passing nil
+// does not panic or add an entry.
+func TestMockClient_WithDeployRequestCompleted_Nil(t *testing.T) {
+	m := NewMockClient().WithDeployRequestCompleted(nil)
+	rc, err := m.GetDeployRequestCompletedByID(context.Background(), common.RequestIdType{})
+	require.NoError(t, err)
+	assert.Nil(t, rc)
+}
+
 // TestMockClient_GetUserEvents_Empty verifies that querying an application
 // with no registered events returns nil.
 func TestMockClient_GetUserEvents_Empty(t *testing.T) {

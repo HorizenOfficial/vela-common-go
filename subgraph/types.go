@@ -11,11 +11,14 @@ import (
 type Client interface {
 	HealthCheck(ctx context.Context) error
 	GetRequestCompletedByID(ctx context.Context, requestID common.RequestIdType) (*RequestCompleted, error)
+	GetDeployRequestCompletedByID(ctx context.Context, requestID common.RequestIdType) (*RequestCompleted, error)
 	GetUserEvents(ctx context.Context, applicationID common.ApplicationIdType, eventSubType string, limit int, before *big.Int) ([]UserEvent, error)
 }
 
-// RequestCompleted is the projection returned by the subgraph.
+// RequestCompleted is the projection returned by the subgraph
+// for both RequestCompleted and DeployRequestCompleted entities.
 type RequestCompleted struct {
+	ApplicationID   common.ApplicationIdType
 	RequestID       common.RequestIdType
 	Status          common.RequestResultStatus
 	ErrorCode       uint8
