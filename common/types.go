@@ -57,3 +57,14 @@ const (
 	RequestResultFailed
 	RequestResultUnknown
 )
+
+// DeployModeArtifactRef is the deploy descriptor mode for off-chain artifact reference.
+const DeployModeArtifactRef = "artifact_ref"
+
+// DeployDescriptor defines the v1 deploy payload contract stored in Request.Payload.
+// This is the wire protocol shared between the wallet (producer) and the framework (consumer).
+type DeployDescriptor struct {
+	Mode       string `json:"mode"`
+	ArtifactID string `json:"artifactId"`
+	WasmSHA256 string `json:"wasmSha256"`
+}
