@@ -2,7 +2,7 @@
 
 ## Overview
 
-This feature adds opt-in privacy for event subtypes. Users can submit a **seed** (a secp256k1 signature) alongside their P521 public key during the `ASSOCIATEKEY` request. When a seed is registered, the executor replaces the WASM-provided `EventSubType` with a randomly chosen value from a deterministic 50-element set, preventing event linkability.
+This feature adds opt-in privacy for event subtypes. Users can submit a **seed** (a 65-byte random value) alongside their P521 public key during the `ASSOCIATEKEY` request. When a seed is registered, the executor replaces the WASM-provided `EventSubType` with a randomly chosen value from a deterministic 50-element set, preventing event linkability.
 
 ---
 
@@ -17,7 +17,7 @@ The `ASSOCIATEKEY` request now supports two payload sizes:
 
 The encrypted seed is 93 bytes = AES-256-GCM envelope:
 - **12 bytes**: nonce
-- **65 bytes**: seed ciphertext (secp256k1 signature)
+- **65 bytes**: seed ciphertext
 - **16 bytes**: GCM authentication tag
 
 The shared key for AES-256-GCM is derived via **ECDH(user_P521_private, enclave_P521_public)**.
@@ -33,28 +33,13 @@ if (requestType == REQUEST_TYPE_ASSOCIATEKEY) {
 
 ## 2. Seed Definition
 
-A **seed** is a 65-byte secp256k1 signature in `[R || S || V]` format (V in {0, 1}).
+A **seed** is a 65-byte random value chosen by the client. No specific format is required.
 
-The signed message is:
-```
-keccak256("subtype-key-v1")
-```
-
-The constant `SubtypeKeyMessage = "subtype-key-v1"` is defined in the executor. Changing this string rotates all user subtype sets.
+The seed is transmitted encrypted inside the `ASSOCIATEKEY` payload; the AES-256-GCM encryption (using a key derived from the user's own P521 key pair) already proves that only the legitimate key-holder could have submitted it. No additional signature verification is performed.
 
 ### Client-side seed generation (pseudocode)
 ```
-msgHash = keccak256("subtype-key-v1")
-seed = secp256k1_sign(msgHash, user_secp256k1_private_key)  // 65 bytes [R||S||V]
-```
-
-### Seed verification (executor-side)
-The executor recovers the public key from the signature and checks that the corresponding address matches `req.Sender`:
-```go
-msgHash := ethCrypto.Keccak256([]byte("subtype-key-v1"))
-recoveredPub, _ := ethCrypto.SigToPub(msgHash, seed)
-recoveredAddr := ethCrypto.PubkeyToAddress(*recoveredPub)
-// recoveredAddr must equal req.Sender
+seed = random_bytes(65)
 ```
 
 ---
@@ -68,8 +53,7 @@ recoveredAddr := ethCrypto.PubkeyToAddress(*recoveredPub)
 4. IF payload is 226 bytes:
    a. Extract encrypted seed: payload[133:226]
    b. Decrypt: ECDH(user_P521_pub, enclave_P521_priv) → AES-256-GCM decrypt → 65-byte seed
-   c. Verify: recover secp256k1 signer from seed, must match sender address
-   d. Store seed: appData.AddSeed(sender, seed)
+   c. Store seed: appData.AddSeed(sender, seed)
 5. Add fuel cost (10 units)
 ```
 
@@ -95,7 +79,7 @@ The binary format for persisted application state:
 │ Seed Count       │ 4 bytes (uint32, big-endian)          │
 │ Seed Entries     │ repeat Seed Count times:              │
 │   Address        │   20 bytes (Ethereum address)         │
-│   Seed           │   65 bytes (secp256k1 signature)      │
+│   Seed           │   65 bytes (random value)             │
 ├──────────────────────────────────────────────────────────┤
 │ App State        │ variable length (remaining bytes)     │
 └──────────────────────────────────────────────────────────┘
@@ -207,10 +191,9 @@ type UserEvent @entity(immutable: true) {
 
 To be compatible with this feature, a client must:
 
-1. **Generate a secp256k1 key pair** for the user (or reuse an existing one)
-2. **Sign the message** `keccak256("subtype-key-v1")` with the secp256k1 private key → 65-byte seed
-3. **Encrypt the seed** using ECDH with the user's P521 private key and the enclave's P521 public key, producing a 93-byte AES-256-GCM envelope (12-byte nonce + 65-byte ciphertext + 16-byte tag)
-4. **Submit ASSOCIATEKEY** with 226-byte payload: `P521_public_key (133) || encrypted_seed (93)`
-5. **Query events** using `eventSubType` — the client must be aware that with a seed, subtypes are no longer application-defined but are hex-encoded HMAC values. The client can reconstruct all 50 possible subtypes using `HMAC-SHA256(seed, byte(i))` for `i` in `[1, 50]` to filter events.
+1. **Generate 65 random bytes** to use as the seed
+2. **Encrypt the seed** using ECDH with the user's P521 private key and the enclave's P521 public key, producing a 93-byte AES-256-GCM envelope (12-byte nonce + 65-byte ciphertext + 16-byte tag)
+3. **Submit ASSOCIATEKEY** with 226-byte payload: `P521_public_key (133) || encrypted_seed (93)`
+4. **Query events** using `eventSubType` — the client must be aware that with a seed, subtypes are no longer application-defined but are hex-encoded HMAC values. The client can reconstruct all 50 possible subtypes using `HMAC-SHA256(seed, byte(i))` for `i` in `[1, 50]` to filter events.
 
 If the client does **not** want privacy-preserving subtypes, it submits the 133-byte payload (key only) as before — fully backward compatible.
