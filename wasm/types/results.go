@@ -37,3 +37,10 @@ type ProcessResult struct {
 	Fuel        *Uint256     `json:"fuel"`
 	Error       string       `json:"error,omitempty"`
 }
+
+// DeployResult is the result of the deploy() guest export
+type DeployResult struct {
+	State []byte   `json:"state"`
+	Fuel  *Uint256 `json:"fuel"`
+	Error string   `json:"error,omitempty"`
+}

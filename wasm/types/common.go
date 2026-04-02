@@ -14,6 +14,7 @@ type PlainEvent struct {
 
 // Withdrawal is a local replacement for common.Withdrawal
 type Withdrawal struct {
+	TokenAddress       Address  `json:"tokenAddress"`
 	DestinationAddress Address  `json:"destinationAddress"`
 	Amount             *Uint256 `json:"amount"`
 }
