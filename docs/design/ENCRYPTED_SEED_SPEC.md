@@ -2,7 +2,7 @@
 
 ## Overview
 
-This feature adds opt-in privacy for event subtypes. Users can submit a **seed** (a 65-byte random value) alongside their P521 public key during the `ASSOCIATEKEY` request. When a seed is registered, the executor replaces the WASM-provided `EventSubType` with a randomly chosen value from a deterministic 50-element set, preventing event linkability.
+This feature adds opt-in privacy for event subtypes. Users can submit a **seed** (a 65-byte random value, transmitted as a 93-byte AES-256-GCM encrypted envelope) alongside their P521 public key during the `ASSOCIATEKEY` request. When a seed is registered, the executor replaces the WASM-provided `EventSubType` with a randomly chosen value from a deterministic 50-element set, preventing event linkability.
 
 ---
 
