@@ -189,6 +189,55 @@ func TestMockClient_GetUserEvents_Pagination(t *testing.T) {
 	assert.Empty(t, page3)
 }
 
+// TestMockClient_GetUserEventsBySubTypes_FiltersMultiple verifies that events
+// are filtered to those matching any of the provided subtypes.
+func TestMockClient_GetUserEventsBySubTypes_FiltersMultiple(t *testing.T) {
+	appID := common.NewApplicationId(1)
+	m := NewMockClient().WithUserEvents(appID, []UserEvent{
+		{ApplicationID: appID, BlockNumber: 1, EventSubType: "0xaaa"},
+		{ApplicationID: appID, BlockNumber: 2, EventSubType: "0xbbb"},
+		{ApplicationID: appID, BlockNumber: 3, EventSubType: "0xccc"},
+		{ApplicationID: appID, BlockNumber: 4, EventSubType: "0xddd"},
+	})
+
+	events, err := m.GetUserEventsBySubTypes(context.Background(), appID, []string{"0xaaa", "0xccc"}, 100, nil)
+	require.NoError(t, err)
+	require.Len(t, events, 2)
+	assert.Equal(t, "0xccc", events[0].EventSubType) // descending order
+	assert.Equal(t, "0xaaa", events[1].EventSubType)
+}
+
+// TestMockClient_GetUserEventsBySubTypes_EmptySlice returns all events when
+// no subtypes are specified.
+func TestMockClient_GetUserEventsBySubTypes_EmptySlice(t *testing.T) {
+	appID := common.NewApplicationId(1)
+	m := NewMockClient().WithUserEvents(appID, []UserEvent{
+		{ApplicationID: appID, BlockNumber: 1, EventSubType: "0xaaa"},
+		{ApplicationID: appID, BlockNumber: 2, EventSubType: "0xbbb"},
+	})
+
+	events, err := m.GetUserEventsBySubTypes(context.Background(), appID, nil, 100, nil)
+	require.NoError(t, err)
+	assert.Len(t, events, 2)
+}
+
+// TestMockClient_GetUserEventsBySubTypes_Before verifies pagination with subtypes.
+func TestMockClient_GetUserEventsBySubTypes_Before(t *testing.T) {
+	appID := common.NewApplicationId(1)
+	m := NewMockClient().WithUserEvents(appID, []UserEvent{
+		{ApplicationID: appID, BlockNumber: 5, LogIndex: 0, EventSubType: "0xaaa"},
+		{ApplicationID: appID, BlockNumber: 10, LogIndex: 0, EventSubType: "0xaaa"},
+		{ApplicationID: appID, BlockNumber: 15, LogIndex: 0, EventSubType: "0xbbb"},
+	})
+
+	before := ComputeSortKey(UserEvent{BlockNumber: 15, LogIndex: 0})
+	events, err := m.GetUserEventsBySubTypes(context.Background(), appID, []string{"0xaaa", "0xbbb"}, 100, before)
+	require.NoError(t, err)
+	require.Len(t, events, 2)
+	assert.Equal(t, uint64(10), events[0].BlockNumber)
+	assert.Equal(t, uint64(5), events[1].BlockNumber)
+}
+
 // TestMockClient_ImplementsClientInterface verifies that *MockClient satisfies
 // the Client interface at compile time.
 func TestMockClient_ImplementsClientInterface(t *testing.T) {

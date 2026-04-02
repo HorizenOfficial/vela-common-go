@@ -141,19 +141,29 @@ query HealthCheck {
 	return nil
 }
 
+type userEventEntity struct {
+	ApplicationID string `json:"applicationId"`
+	RequestID     string `json:"requestId"`
+	EventSubType  string `json:"eventSubType"`
+	EncryptedData string `json:"encryptedData"`
+	BlockNumber   string `json:"blockNumber"`
+	LogIndex      string `json:"logIndex"`
+	SortKey       string `json:"sortKey"`
+}
+
 type userEventsResponse struct {
-	UserEvents []struct {
-		ApplicationID string `json:"applicationId"`
-		RequestID     string `json:"requestId"`
-		EventSubType  string `json:"eventSubType"`
-		EncryptedData string `json:"encryptedData"`
-		BlockNumber   string `json:"blockNumber"`
-		LogIndex      string `json:"logIndex"`
-		SortKey       string `json:"sortKey"`
-	} `json:"userEvents"`
+	UserEvents []userEventEntity `json:"userEvents"`
 }
 
 func (c *client) GetUserEvents(ctx context.Context, applicationID common.ApplicationIdType, eventSubType string, limit int, before *big.Int) ([]UserEvent, error) {
+	var subTypes []string
+	if strings.TrimSpace(eventSubType) != "" {
+		subTypes = []string{eventSubType}
+	}
+	return c.GetUserEventsBySubTypes(ctx, applicationID, subTypes, limit, before)
+}
+
+func (c *client) GetUserEventsBySubTypes(ctx context.Context, applicationID common.ApplicationIdType, eventSubTypes []string, limit int, before *big.Int) ([]UserEvent, error) {
 	if limit <= 0 {
 		limit = 10
 	}
@@ -168,10 +178,10 @@ func (c *client) GetUserEvents(ctx context.Context, applicationID common.Applica
 
 	varDefs := ""
 	whereParts := []string{"applicationId: $applicationId"}
-	if strings.TrimSpace(eventSubType) != "" {
-		varDefs += ", $eventSubType: Bytes!"
-		variables["eventSubType"] = eventSubType
-		whereParts = append(whereParts, "eventSubType: $eventSubType")
+	if len(eventSubTypes) > 0 {
+		varDefs += ", $eventSubTypes: [Bytes!]!"
+		variables["eventSubTypes"] = eventSubTypes
+		whereParts = append(whereParts, "eventSubType_in: $eventSubTypes")
 	}
 	if before != nil {
 		varDefs += ", $before: BigInt!"
@@ -205,8 +215,12 @@ query($applicationId: BigInt!, $limit: Int!%s) {
 		return nil, fmt.Errorf("subgraph returned errors: %v", resp.Errors[0].Message)
 	}
 
-	events := make([]UserEvent, 0, len(resp.Data.UserEvents))
-	for _, entity := range resp.Data.UserEvents {
+	return parseUserEventEntities(applicationID, resp.Data.UserEvents)
+}
+
+func parseUserEventEntities(applicationID common.ApplicationIdType, entities []userEventEntity) ([]UserEvent, error) {
+	events := make([]UserEvent, 0, len(entities))
+	for _, entity := range entities {
 		reqID, err := parseRequestID(entity.RequestID)
 		if err != nil {
 			return nil, fmt.Errorf("invalid requestId %q: %w", entity.RequestID, err)
@@ -242,7 +256,6 @@ query($applicationId: BigInt!, $limit: Int!%s) {
 			SortKey:       sortKey,
 		})
 	}
-
 	return events, nil
 }
 
