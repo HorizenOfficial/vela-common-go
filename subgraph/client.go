@@ -46,21 +46,21 @@ type healthCheckResponse struct {
 	} `json:"_meta"`
 }
 
-type requestCompletedResponse struct {
-	RequestCompleteds []struct {
-		RequestID       string      `json:"requestId"`
-		Status          json.Number `json:"status"`
-		ErrorCode       json.Number `json:"errorCode"`
-		ErrorMessage    string      `json:"errorMessage"`
-		ApplicationFees json.Number `json:"applicationFees"`
-		BlockNumber     json.Number `json:"blockNumber"`
-	} `json:"requestCompleteds"`
+type completedEntity struct {
+	ApplicationID   string      `json:"applicationId"`
+	RequestID       string      `json:"requestId"`
+	Status          json.Number `json:"status"`
+	ErrorCode       json.Number `json:"errorCode"`
+	ErrorMessage    string      `json:"errorMessage"`
+	ApplicationFees json.Number `json:"applicationFees"`
+	BlockNumber     json.Number `json:"blockNumber"`
 }
 
 func (c *client) GetRequestCompletedByID(ctx context.Context, requestID common.RequestIdType) (*RequestCompleted, error) {
 	query := `
 query($requestId: Bytes!) {
   requestCompleteds(where: { requestId: $requestId }, first: 1) {
+    applicationId
     requestId
     status
     errorCode
@@ -70,7 +70,10 @@ query($requestId: Bytes!) {
   }
 }`
 
-	var resp graphResponse[requestCompletedResponse]
+	type response struct {
+		RequestCompleteds []completedEntity `json:"requestCompleteds"`
+	}
+	var resp graphResponse[response]
 	if err := c.doGraphQL(ctx, query, map[string]interface{}{"requestId": "0x" + requestID.String()}, &resp); err != nil {
 		return nil, err
 	}
@@ -81,7 +84,49 @@ query($requestId: Bytes!) {
 		return nil, nil
 	}
 
-	entity := resp.Data.RequestCompleteds[0]
+	return parseCompletedEntity(resp.Data.RequestCompleteds[0], requestID)
+}
+
+func (c *client) GetDeployRequestCompletedByID(ctx context.Context, requestID common.RequestIdType) (*RequestCompleted, error) {
+	query := `
+query($requestId: Bytes!) {
+  deployRequestCompleteds(where: { requestId: $requestId }, first: 1) {
+    applicationId
+    requestId
+    status
+    errorCode
+    errorMessage
+    applicationFees
+    blockNumber
+  }
+}`
+
+	type response struct {
+		DeployRequestCompleteds []completedEntity `json:"deployRequestCompleteds"`
+	}
+	var resp graphResponse[response]
+	if err := c.doGraphQL(ctx, query, map[string]interface{}{"requestId": "0x" + requestID.String()}, &resp); err != nil {
+		return nil, err
+	}
+	if len(resp.Errors) > 0 {
+		return nil, fmt.Errorf("subgraph returned errors: %v", resp.Errors[0].Message)
+	}
+	if len(resp.Data.DeployRequestCompleteds) == 0 {
+		return nil, nil
+	}
+
+	return parseCompletedEntity(resp.Data.DeployRequestCompleteds[0], requestID)
+}
+
+func parseCompletedEntity(entity completedEntity, requestID common.RequestIdType) (*RequestCompleted, error) {
+	var appID uint64
+	if entity.ApplicationID != "" {
+		var err error
+		appID, err = strconv.ParseUint(entity.ApplicationID, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("invalid applicationId %q: %w", entity.ApplicationID, err)
+		}
+	}
 
 	statusUint, err := strconv.ParseUint(entity.Status.String(), 10, 8)
 	if err != nil {
@@ -108,6 +153,7 @@ query($requestId: Bytes!) {
 	}
 
 	return &RequestCompleted{
+		ApplicationID:   common.ApplicationIdType(appID),
 		RequestID:       requestID,
 		Status:          status,
 		ErrorCode:       uint8(errorCodeUint),
@@ -141,19 +187,29 @@ query HealthCheck {
 	return nil
 }
 
+type userEventEntity struct {
+	ApplicationID string `json:"applicationId"`
+	RequestID     string `json:"requestId"`
+	EventSubType  string `json:"eventSubType"`
+	EncryptedData string `json:"encryptedData"`
+	BlockNumber   string `json:"blockNumber"`
+	LogIndex      string `json:"logIndex"`
+	SortKey       string `json:"sortKey"`
+}
+
 type userEventsResponse struct {
-	UserEvents []struct {
-		ApplicationID string `json:"applicationId"`
-		RequestID     string `json:"requestId"`
-		EventSubType  string `json:"eventSubType"`
-		EncryptedData string `json:"encryptedData"`
-		BlockNumber   string `json:"blockNumber"`
-		LogIndex      string `json:"logIndex"`
-		SortKey       string `json:"sortKey"`
-	} `json:"userEvents"`
+	UserEvents []userEventEntity `json:"userEvents"`
 }
 
 func (c *client) GetUserEvents(ctx context.Context, applicationID common.ApplicationIdType, eventSubType string, limit int, before *big.Int) ([]UserEvent, error) {
+	var subTypes []string
+	if strings.TrimSpace(eventSubType) != "" {
+		subTypes = []string{eventSubType}
+	}
+	return c.GetUserEventsBySubTypes(ctx, applicationID, subTypes, limit, before)
+}
+
+func (c *client) GetUserEventsBySubTypes(ctx context.Context, applicationID common.ApplicationIdType, eventSubTypes []string, limit int, before *big.Int) ([]UserEvent, error) {
 	if limit <= 0 {
 		limit = 10
 	}
@@ -168,10 +224,10 @@ func (c *client) GetUserEvents(ctx context.Context, applicationID common.Applica
 
 	varDefs := ""
 	whereParts := []string{"applicationId: $applicationId"}
-	if strings.TrimSpace(eventSubType) != "" {
-		varDefs += ", $eventSubType: Bytes!"
-		variables["eventSubType"] = eventSubType
-		whereParts = append(whereParts, "eventSubType: $eventSubType")
+	if len(eventSubTypes) > 0 {
+		varDefs += ", $eventSubTypes: [Bytes!]!"
+		variables["eventSubTypes"] = eventSubTypes
+		whereParts = append(whereParts, "eventSubType_in: $eventSubTypes")
 	}
 	if before != nil {
 		varDefs += ", $before: BigInt!"
@@ -205,8 +261,12 @@ query($applicationId: BigInt!, $limit: Int!%s) {
 		return nil, fmt.Errorf("subgraph returned errors: %v", resp.Errors[0].Message)
 	}
 
-	events := make([]UserEvent, 0, len(resp.Data.UserEvents))
-	for _, entity := range resp.Data.UserEvents {
+	return parseUserEventEntities(applicationID, resp.Data.UserEvents)
+}
+
+func parseUserEventEntities(applicationID common.ApplicationIdType, entities []userEventEntity) ([]UserEvent, error) {
+	events := make([]UserEvent, 0, len(entities))
+	for _, entity := range entities {
 		reqID, err := parseRequestID(entity.RequestID)
 		if err != nil {
 			return nil, fmt.Errorf("invalid requestId %q: %w", entity.RequestID, err)
@@ -242,7 +302,6 @@ query($applicationId: BigInt!, $limit: Int!%s) {
 			SortKey:       sortKey,
 		})
 	}
-
 	return events, nil
 }
 
