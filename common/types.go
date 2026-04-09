@@ -4,8 +4,12 @@ package common
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 )
+
+// ConstructorParams is an alias for raw JSON constructor parameters passed to the guest deploy function.
+type ConstructorParams = json.RawMessage
 
 // ApplicationIdType represents a unique application identifier.
 type ApplicationIdType uint64
@@ -64,7 +68,8 @@ const DeployModeArtifactRef = "artifact_ref"
 // DeployDescriptor defines the v1 deploy payload contract stored in Request.Payload.
 // This is the wire protocol shared between the wallet (producer) and the framework (consumer).
 type DeployDescriptor struct {
-	Mode       string `json:"mode"`
-	ArtifactID string `json:"artifactId"`
-	WasmSHA256 string `json:"wasmSha256"`
+	Mode              string            `json:"mode"`
+	ArtifactID        string            `json:"artifactId"`
+	WasmSHA256        string            `json:"wasmSha256"`
+	ConstructorParams ConstructorParams `json:"constructorParams,omitempty"`
 }
