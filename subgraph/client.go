@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/HorizenOfficial/vela-common-go/common"
+	ethCommon "github.com/ethereum/go-ethereum/common"
 )
 
 type graphError struct {
@@ -387,4 +388,222 @@ func requestIdStringTo32Byte(s string) ([32]byte, error) {
 	var arr32 [32]byte
 	copy(arr32[:], arr)
 	return arr32, nil
+}
+
+// --- ERC-20 entity queries ---
+
+type refundEntity struct {
+	ApplicationID string `json:"applicationId"`
+	RequestID     string `json:"requestId"`
+	To            string `json:"to"`
+	TokenAddress  string `json:"tokenAddress"`
+	Amount        string `json:"amount"`
+	BlockNumber   string `json:"blockNumber"`
+}
+
+func (c *client) GetRefunds(ctx context.Context, applicationID common.ApplicationIdType, requestID *common.RequestIdType, limit int) ([]OnChainRefund, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+	vars := map[string]interface{}{
+		"appId": fmt.Sprintf("%d", applicationID),
+		"first": limit,
+	}
+
+	where := `applicationId: $appId`
+	if requestID != nil {
+		vars["reqId"] = "0x" + hex.EncodeToString(requestID[:])
+		where += `, requestId: $reqId`
+	}
+
+	query := fmt.Sprintf(`query($appId: String!, $first: Int!%s) {
+		onChainRefunds(first: $first, where: {%s}, orderBy: blockNumber, orderDirection: desc) {
+			applicationId requestId to tokenAddress amount blockNumber
+		}
+	}`, func() string {
+		if requestID != nil {
+			return ", $reqId: String!"
+		}
+		return ""
+	}(), where)
+
+	type response struct {
+		OnChainRefunds []refundEntity `json:"onChainRefunds"`
+	}
+	var resp graphResponse[response]
+	if err := c.doGraphQL(ctx, query, vars, &resp); err != nil {
+		return nil, err
+	}
+	if len(resp.Errors) > 0 {
+		return nil, fmt.Errorf("subgraph returned errors: %v", resp.Errors[0].Message)
+	}
+
+	result := make([]OnChainRefund, 0, len(resp.Data.OnChainRefunds))
+	for _, e := range resp.Data.OnChainRefunds {
+		reqID, err := parseRequestID(e.RequestID)
+		if err != nil {
+			return nil, fmt.Errorf("parsing refund requestId: %w", err)
+		}
+		appID, err := strconv.ParseUint(e.ApplicationID, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("parsing refund applicationId: %w", err)
+		}
+		amount, ok := stringToBigInt(e.Amount)
+		if !ok {
+			return nil, fmt.Errorf("parsing refund amount %q", e.Amount)
+		}
+		bn, err := strconv.ParseUint(e.BlockNumber, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("parsing refund blockNumber: %w", err)
+		}
+		result = append(result, OnChainRefund{
+			ApplicationID: common.NewApplicationId(appID),
+			RequestID:     reqID,
+			To:            ethCommon.HexToAddress(e.To),
+			TokenAddress:  ethCommon.HexToAddress(e.TokenAddress),
+			Amount:        amount,
+			BlockNumber:   bn,
+		})
+	}
+	return result, nil
+}
+
+type withdrawalEntity struct {
+	ApplicationID string `json:"applicationId"`
+	RequestID     string `json:"requestId"`
+	To            string `json:"to"`
+	TokenAddress  string `json:"tokenAddress"`
+	Amount        string `json:"amount"`
+	BlockNumber   string `json:"blockNumber"`
+}
+
+func (c *client) GetWithdrawals(ctx context.Context, applicationID common.ApplicationIdType, requestID *common.RequestIdType, limit int) ([]OnChainWithdrawal, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+	vars := map[string]interface{}{
+		"appId": fmt.Sprintf("%d", applicationID),
+		"first": limit,
+	}
+
+	where := `applicationId: $appId`
+	if requestID != nil {
+		vars["reqId"] = "0x" + hex.EncodeToString(requestID[:])
+		where += `, requestId: $reqId`
+	}
+
+	query := fmt.Sprintf(`query($appId: String!, $first: Int!%s) {
+		onChainWithdrawals(first: $first, where: {%s}, orderBy: blockNumber, orderDirection: desc) {
+			applicationId requestId to tokenAddress amount blockNumber
+		}
+	}`, func() string {
+		if requestID != nil {
+			return ", $reqId: String!"
+		}
+		return ""
+	}(), where)
+
+	type response struct {
+		OnChainWithdrawals []withdrawalEntity `json:"onChainWithdrawals"`
+	}
+	var resp graphResponse[response]
+	if err := c.doGraphQL(ctx, query, vars, &resp); err != nil {
+		return nil, err
+	}
+	if len(resp.Errors) > 0 {
+		return nil, fmt.Errorf("subgraph returned errors: %v", resp.Errors[0].Message)
+	}
+
+	result := make([]OnChainWithdrawal, 0, len(resp.Data.OnChainWithdrawals))
+	for _, e := range resp.Data.OnChainWithdrawals {
+		reqID, err := parseRequestID(e.RequestID)
+		if err != nil {
+			return nil, fmt.Errorf("parsing withdrawal requestId: %w", err)
+		}
+		appID, err := strconv.ParseUint(e.ApplicationID, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("parsing withdrawal applicationId: %w", err)
+		}
+		amount, ok := stringToBigInt(e.Amount)
+		if !ok {
+			return nil, fmt.Errorf("parsing withdrawal amount %q", e.Amount)
+		}
+		bn, err := strconv.ParseUint(e.BlockNumber, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("parsing withdrawal blockNumber: %w", err)
+		}
+		result = append(result, OnChainWithdrawal{
+			ApplicationID: common.NewApplicationId(appID),
+			RequestID:     reqID,
+			To:            ethCommon.HexToAddress(e.To),
+			TokenAddress:  ethCommon.HexToAddress(e.TokenAddress),
+			Amount:        amount,
+			BlockNumber:   bn,
+		})
+	}
+	return result, nil
+}
+
+type claimEntity struct {
+	TokenAddress string `json:"tokenAddress"`
+	Payee        string `json:"payee"`
+	Amount       string `json:"amount"`
+	BlockNumber  string `json:"blockNumber"`
+}
+
+func (c *client) GetClaimsExecuted(ctx context.Context, payee ethCommon.Address, tokenAddress *ethCommon.Address, limit int) ([]ClaimExecuted, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+	vars := map[string]interface{}{
+		"payee": strings.ToLower(payee.Hex()),
+		"first": limit,
+	}
+
+	where := `payee: $payee`
+	if tokenAddress != nil {
+		vars["token"] = strings.ToLower(tokenAddress.Hex())
+		where += `, tokenAddress: $token`
+	}
+
+	query := fmt.Sprintf(`query($payee: String!, $first: Int!%s) {
+		claimExecuteds(first: $first, where: {%s}, orderBy: blockNumber, orderDirection: desc) {
+			tokenAddress payee amount blockNumber
+		}
+	}`, func() string {
+		if tokenAddress != nil {
+			return ", $token: String!"
+		}
+		return ""
+	}(), where)
+
+	type response struct {
+		ClaimExecuteds []claimEntity `json:"claimExecuteds"`
+	}
+	var resp graphResponse[response]
+	if err := c.doGraphQL(ctx, query, vars, &resp); err != nil {
+		return nil, err
+	}
+	if len(resp.Errors) > 0 {
+		return nil, fmt.Errorf("subgraph returned errors: %v", resp.Errors[0].Message)
+	}
+
+	result := make([]ClaimExecuted, 0, len(resp.Data.ClaimExecuteds))
+	for _, e := range resp.Data.ClaimExecuteds {
+		amount, ok := stringToBigInt(e.Amount)
+		if !ok {
+			return nil, fmt.Errorf("parsing claim amount %q", e.Amount)
+		}
+		bn, err := strconv.ParseUint(e.BlockNumber, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("parsing claim blockNumber: %w", err)
+		}
+		result = append(result, ClaimExecuted{
+			TokenAddress: ethCommon.HexToAddress(e.TokenAddress),
+			Payee:        ethCommon.HexToAddress(e.Payee),
+			Amount:       amount,
+			BlockNumber:  bn,
+		})
+	}
+	return result, nil
 }

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/HorizenOfficial/vela-common-go/common"
+	ethCommon "github.com/ethereum/go-ethereum/common"
 )
 
 // MockClient provides canned responses for tests.
@@ -92,6 +93,18 @@ func (m *MockClient) GetUserEventsBySubTypes(_ context.Context, applicationID co
 	}
 
 	return mockApplySortAndLimit(filtered, limit), nil
+}
+
+func (m *MockClient) GetRefunds(_ context.Context, _ common.ApplicationIdType, _ *common.RequestIdType, _ int) ([]OnChainRefund, error) {
+	return nil, nil
+}
+
+func (m *MockClient) GetWithdrawals(_ context.Context, _ common.ApplicationIdType, _ *common.RequestIdType, _ int) ([]OnChainWithdrawal, error) {
+	return nil, nil
+}
+
+func (m *MockClient) GetClaimsExecuted(_ context.Context, _ ethCommon.Address, _ *ethCommon.Address, _ int) ([]ClaimExecuted, error) {
+	return nil, nil
 }
 
 func mockApplySortAndLimit(events []UserEvent, limit int) []UserEvent {
