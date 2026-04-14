@@ -116,6 +116,11 @@ func TestPtrToString(t *testing.T) {
 		require.Equal(t, "", result)
 	})
 
+	t.Run("nil pointer and zero length (legitimate empty)", func(t *testing.T) {
+		result := PtrToString(nil, 0)
+		require.Equal(t, "", result)
+	})
+
 	t.Run("zero length", func(t *testing.T) {
 		data := []byte("hello")
 		result := PtrToString(&data[0], 0)
