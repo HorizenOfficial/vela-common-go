@@ -22,16 +22,18 @@ type LoadModuleResult struct {
 
 // DepositResult is a local replacement for wasmCommon.DepositResult
 type DepositResult struct {
-	State  []byte       `json:"state"`
-	Events []PlainEvent `json:"events"`
-	Fuel   *Uint256     `json:"fuel"`
-	Error  string       `json:"error,omitempty"`
+	State     []byte       `json:"state"`
+	Events    []PlainEvent `json:"events"`
+	AppEvents []AppEvent   `json:"appEvents"`
+	Fuel      *Uint256     `json:"fuel"`
+	Error     string       `json:"error,omitempty"`
 }
 
 // ProcessResult is a local replacement for wasmCommon.ProcessResult
 type ProcessResult struct {
 	State       []byte       `json:"state"`
 	Events      []PlainEvent `json:"events"`
+	AppEvents   []AppEvent   `json:"appEvents"`
 	Withdrawals []Withdrawal `json:"withdrawals"`
 	Report      []byte       `json:"report,omitempty"` // Optional deanonymization report
 	Fuel        *Uint256     `json:"fuel"`

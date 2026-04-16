@@ -12,6 +12,12 @@ type PlainEvent struct {
 	Data         []byte  `json:"data"`
 }
 
+// AppEvent is a local replacement for common.AppEvent (application-level, non-encrypted event)
+type AppEvent struct {
+	EventSubType string `json:"eventSubType"`
+	Data         []byte `json:"data"`
+}
+
 // Withdrawal is a local replacement for common.Withdrawal
 type Withdrawal struct {
 	TokenAddress       Address  `json:"tokenAddress"`
