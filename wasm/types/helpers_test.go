@@ -189,6 +189,12 @@ func TestResultTypesJSON(t *testing.T) {
 					Data:         []byte("event data"),
 				},
 			},
+			AppEvents: []AppEvent{
+				{
+					EventSubType: "deposit_received",
+					Data:         []byte(`{"tokenAddress":"0x0000","amount":"0x3e8"}`),
+				},
+			},
 			Fuel:  NewUint256(100),
 			Error: "",
 		}
@@ -201,12 +207,36 @@ func TestResultTypesJSON(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, parsed.Events, 1)
 		require.Equal(t, "deposit", parsed.Events[0].EventSubType)
+		require.Len(t, parsed.AppEvents, 1)
+		require.Equal(t, "deposit_received", parsed.AppEvents[0].EventSubType)
+		require.Equal(t, []byte(`{"tokenAddress":"0x0000","amount":"0x3e8"}`), parsed.AppEvents[0].Data)
+	})
+
+	t.Run("DepositResult_NoAppEvents", func(t *testing.T) {
+		result := DepositResult{
+			State: []byte("state"),
+			Fuel:  NewUint256(100),
+		}
+
+		data, err := json.Marshal(result)
+		require.NoError(t, err)
+
+		var parsed DepositResult
+		err = json.Unmarshal(data, &parsed)
+		require.NoError(t, err)
+		require.Empty(t, parsed.AppEvents)
 	})
 
 	t.Run("ProcessResult", func(t *testing.T) {
 		result := ProcessResult{
 			State:  []byte("state"),
 			Events: []PlainEvent{},
+			AppEvents: []AppEvent{
+				{
+					EventSubType: "transfer_receipt",
+					Data:         []byte{0xab, 0xcd},
+				},
+			},
 			Withdrawals: []Withdrawal{
 				{
 					DestinationAddress: BytesToAddress([]byte{0xde, 0xad, 0xbe, 0xef}),
@@ -226,6 +256,9 @@ func TestResultTypesJSON(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, parsed.Withdrawals, 1)
 		require.Equal(t, "1000000", parsed.Withdrawals[0].Amount.String())
+		require.Len(t, parsed.AppEvents, 1)
+		require.Equal(t, "transfer_receipt", parsed.AppEvents[0].EventSubType)
+		require.Equal(t, []byte{0xab, 0xcd}, parsed.AppEvents[0].Data)
 	})
 
 }

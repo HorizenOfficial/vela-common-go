@@ -88,8 +88,8 @@ The host uses `math/big.Int` and `go-ethereum/common.Address`; the guest uses `U
 **`wasm/types/`** - Core data types for WASM guest environment:
 - `Uint256` - 256-bit unsigned integer as `[4]uint64` (little-endian words), with overflow-detecting arithmetic
 - `Address` - Ethereum-style 20-byte address
-- `PlainEvent`, `Withdrawal` - Domain types replacing host equivalents
-- Result types (`LoadModuleResult`, `DepositResult`, `ProcessResult`, `DeanonymizationResult`) - WASM operation returns
+- `PlainEvent`, `AppEvent`, `Withdrawal` - Domain types replacing host equivalents
+- Result types (`LoadModuleResult`, `DepositResult`, `ProcessResult`, `DeployResult`) - WASM operation returns. `DepositResult` and `ProcessResult` include `AppEvents []AppEvent` for application-level non-encrypted events
 - `helpers.go` - WASM pointer ↔ type conversion (`PtrToUint256`, `PtrToAddress`, `SerializeAndWriteResult`)
 
 **`wasm/utils/`** - Runtime utilities:
@@ -129,8 +129,9 @@ With Go 1.22+, each iteration of a `for range` loop creates a new scope. Using `
 The framework (`vela`) and the WASM apps live in separate type worlds connected only by JSON:
 
 - **Host-side types** (framework): `ethCommon.Address`, `*common.Big`, `common.Event`, `common.Withdrawal`
-- **Guest-side types** (this library): `types.Address`, `*types.Uint256`, `types.PlainEvent`, `types.Withdrawal`
+- **Guest-side types** (this library): `types.Address`, `*types.Uint256`, `types.PlainEvent`, `types.AppEvent`, `types.Withdrawal`
 - **App-specific event types** (each app): `DepositEvent`, `SenderEvent`, `RecipientEvent`, `WithdrawalEvent` — defined locally in each WASM app's `app/types.go` using guest-side types. Host-side test code defines its own mirror types using `*common.Big` / `ethCommon.Address` for JSON deserialization of the same events.
+- **AppEvent** (`types.AppEvent`): application-level event with `EventSubType` and `Data`. Unlike `PlainEvent`, it has no `UserID` — it is not user-directed and not encrypted by the executor. The host converts `EventSubType` (string) to `bytes32` at the serialization boundary for on-chain emission.
 
 The framework never imports app-specific types. Framework test helpers (`pkg/testutil`) validate events as opaque JSON (`json.Valid()`), not by deserializing into app-specific structs. App-specific event validation belongs in each app's own system tests.
 
