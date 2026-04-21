@@ -456,7 +456,7 @@ func TestClient_GetUserEvents_ParsesResponse(t *testing.T) {
 				{
 					"applicationId": "1",
 					"requestId":     "0x0000000000000000000000000000000000000000000000000000000000000001",
-					"eventSubType":  "deposit",
+					"eventSubType":  "0xdeadbeef",
 					"encryptedData": "0xcafe",
 					"blockNumber":   "100",
 					"logIndex":      "3",
@@ -468,13 +468,14 @@ func TestClient_GetUserEvents_ParsesResponse(t *testing.T) {
 
 	c := NewClient(srv.URL)
 	appID := common.NewApplicationId(1)
-	events, err := c.GetUserEvents(context.Background(), appID, "", 10, nil)
+	events, err := c.GetUserEvents(context.Background(), appID, [32]byte{}, 10, nil)
 	require.NoError(t, err)
 	require.Len(t, events, 1)
 
+	expectedSubType := [32]byte{0xde, 0xad, 0xbe, 0xef}
 	ev := events[0]
 	assert.Equal(t, appID, ev.ApplicationID)
-	assert.Equal(t, "deposit", ev.EventSubType)
+	assert.Equal(t, expectedSubType, ev.EventSubType)
 	assert.Equal(t, []byte{0xca, 0xfe}, ev.EncryptedData)
 	assert.Equal(t, uint64(100), ev.BlockNumber)
 	assert.Equal(t, uint64(3), ev.LogIndex)
@@ -514,12 +515,16 @@ func TestClient_GetUserEventsBySubTypes_ParsesResponse(t *testing.T) {
 
 	c := NewClient(srv.URL)
 	appID := common.NewApplicationId(1)
-	events, err := c.GetUserEventsBySubTypes(context.Background(), appID, []string{"0xaabbcc", "0xddeeff"}, 10, nil)
+	var stAABBCC [32]byte
+	stAABBCC[0], stAABBCC[1], stAABBCC[2] = 0xaa, 0xbb, 0xcc
+	var stDDEEFF [32]byte
+	stDDEEFF[0], stDDEEFF[1], stDDEEFF[2] = 0xdd, 0xee, 0xff
+	events, err := c.GetUserEventsBySubTypes(context.Background(), appID, [][32]byte{stAABBCC, stDDEEFF}, 10, nil)
 	require.NoError(t, err)
 	require.Len(t, events, 2)
 
-	assert.Equal(t, "0xaabbcc", events[0].EventSubType)
-	assert.Equal(t, "0xddeeff", events[1].EventSubType)
+	assert.Equal(t, stAABBCC, events[0].EventSubType)
+	assert.Equal(t, stDDEEFF, events[1].EventSubType)
 }
 
 // TestClient_GetUserEventsBySubTypes_Empty verifies that an empty subtype
@@ -547,7 +552,7 @@ func TestClient_GetUserEvents_Empty(t *testing.T) {
 	})
 
 	c := NewClient(srv.URL)
-	events, err := c.GetUserEvents(context.Background(), common.NewApplicationId(1), "", 10, nil)
+	events, err := c.GetUserEvents(context.Background(), common.NewApplicationId(1), [32]byte{}, 10, nil)
 	require.NoError(t, err)
 	assert.Empty(t, events)
 }

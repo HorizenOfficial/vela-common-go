@@ -4,7 +4,6 @@ import (
 	"context"
 	"math/big"
 	"sort"
-	"strings"
 
 	"github.com/HorizenOfficial/vela-common-go/common"
 	ethCommon "github.com/ethereum/go-ethereum/common"
@@ -62,21 +61,21 @@ func (m *MockClient) HealthCheck(context.Context) error {
 	return nil
 }
 
-func (m *MockClient) GetUserEvents(_ context.Context, applicationID common.ApplicationIdType, eventSubType string, limit int, before *big.Int) ([]UserEvent, error) {
-	var subTypes []string
-	if strings.TrimSpace(eventSubType) != "" {
-		subTypes = []string{eventSubType}
+func (m *MockClient) GetUserEvents(_ context.Context, applicationID common.ApplicationIdType, eventSubType [32]byte, limit int, before *big.Int) ([]UserEvent, error) {
+	var subTypes [][32]byte
+	if eventSubType != ([32]byte{}) {
+		subTypes = [][32]byte{eventSubType}
 	}
 	return m.GetUserEventsBySubTypes(context.Background(), applicationID, subTypes, limit, before)
 }
 
-func (m *MockClient) GetUserEventsBySubTypes(_ context.Context, applicationID common.ApplicationIdType, eventSubTypes []string, limit int, before *big.Int) ([]UserEvent, error) {
+func (m *MockClient) GetUserEventsBySubTypes(_ context.Context, applicationID common.ApplicationIdType, eventSubTypes [][32]byte, limit int, before *big.Int) ([]UserEvent, error) {
 	all, ok := m.events[applicationID]
 	if !ok {
 		return nil, nil
 	}
 
-	subTypeSet := make(map[string]bool, len(eventSubTypes))
+	subTypeSet := make(map[[32]byte]bool, len(eventSubTypes))
 	for _, s := range eventSubTypes {
 		subTypeSet[s] = true
 	}

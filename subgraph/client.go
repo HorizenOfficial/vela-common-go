@@ -202,15 +202,15 @@ type userEventsResponse struct {
 	UserEvents []userEventEntity `json:"userEvents"`
 }
 
-func (c *client) GetUserEvents(ctx context.Context, applicationID common.ApplicationIdType, eventSubType string, limit int, before *big.Int) ([]UserEvent, error) {
-	var subTypes []string
-	if strings.TrimSpace(eventSubType) != "" {
-		subTypes = []string{eventSubType}
+func (c *client) GetUserEvents(ctx context.Context, applicationID common.ApplicationIdType, eventSubType [32]byte, limit int, before *big.Int) ([]UserEvent, error) {
+	var subTypes [][32]byte
+	if eventSubType != ([32]byte{}) {
+		subTypes = [][32]byte{eventSubType}
 	}
 	return c.GetUserEventsBySubTypes(ctx, applicationID, subTypes, limit, before)
 }
 
-func (c *client) GetUserEventsBySubTypes(ctx context.Context, applicationID common.ApplicationIdType, eventSubTypes []string, limit int, before *big.Int) ([]UserEvent, error) {
+func (c *client) GetUserEventsBySubTypes(ctx context.Context, applicationID common.ApplicationIdType, eventSubTypes [][32]byte, limit int, before *big.Int) ([]UserEvent, error) {
 	if limit <= 0 {
 		limit = 10
 	}
@@ -226,8 +226,12 @@ func (c *client) GetUserEventsBySubTypes(ctx context.Context, applicationID comm
 	varDefs := ""
 	whereParts := []string{"applicationId: $applicationId"}
 	if len(eventSubTypes) > 0 {
+		hexSubTypes := make([]string, len(eventSubTypes))
+		for i, st := range eventSubTypes {
+			hexSubTypes[i] = "0x" + hex.EncodeToString(st[:])
+		}
 		varDefs += ", $eventSubTypes: [Bytes!]!"
-		variables["eventSubTypes"] = eventSubTypes
+		variables["eventSubTypes"] = hexSubTypes
 		whereParts = append(whereParts, "eventSubType_in: $eventSubTypes")
 	}
 	if before != nil {
@@ -278,6 +282,11 @@ func parseUserEventEntities(applicationID common.ApplicationIdType, entities []u
 			return nil, fmt.Errorf("invalid encryptedData for request %s: %w", reqID.String(), err)
 		}
 
+		subType, err := decodeSubType(entity.EventSubType)
+		if err != nil {
+			return nil, fmt.Errorf("invalid eventSubType for request %s: %w", reqID.String(), err)
+		}
+
 		blockNumber, err := strconv.ParseUint(entity.BlockNumber, 10, 64)
 		if err != nil {
 			return nil, fmt.Errorf("invalid blockNumber %q: %w", entity.BlockNumber, err)
@@ -296,7 +305,7 @@ func parseUserEventEntities(applicationID common.ApplicationIdType, entities []u
 		events = append(events, UserEvent{
 			ApplicationID: applicationID,
 			RequestID:     reqID,
-			EventSubType:  entity.EventSubType,
+			EventSubType:  subType,
 			EncryptedData: data,
 			BlockNumber:   blockNumber,
 			LogIndex:      logIndex,
@@ -304,6 +313,25 @@ func parseUserEventEntities(applicationID common.ApplicationIdType, entities []u
 		})
 	}
 	return events, nil
+}
+
+// decodeSubType parses an "0x"-prefixed hex string (up to 32 bytes, per the
+// on-chain bytes32 topic) into a [32]byte. Shorter hex values are left-aligned
+// and zero-padded on the right, matching how Solidity emits bytes32.
+func decodeSubType(hexString string) ([32]byte, error) {
+	var out [32]byte
+	if hexString == "" {
+		return out, nil
+	}
+	b, err := decodeHex(hexString)
+	if err != nil {
+		return out, err
+	}
+	if len(b) > 32 {
+		return out, fmt.Errorf("eventSubType exceeds 32 bytes: got %d", len(b))
+	}
+	copy(out[:], b)
+	return out, nil
 }
 
 func (c *client) doGraphQL(ctx context.Context, query string, variables map[string]interface{}, dest any) error {
