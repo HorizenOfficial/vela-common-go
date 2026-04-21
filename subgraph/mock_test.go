@@ -9,6 +9,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// sub packs a short ASCII tag into a [32]byte for readable test literals.
+func sub(s string) [32]byte {
+	var b [32]byte
+	copy(b[:], s)
+	return b
+}
+
 // TestMockClient_HealthCheck verifies that the mock always returns nil (healthy).
 func TestMockClient_HealthCheck(t *testing.T) {
 	m := NewMockClient()
@@ -94,7 +101,7 @@ func TestMockClient_WithDeployRequestCompleted_Nil(t *testing.T) {
 // with no registered events returns nil.
 func TestMockClient_GetUserEvents_Empty(t *testing.T) {
 	m := NewMockClient()
-	events, err := m.GetUserEvents(context.Background(), common.NewApplicationId(1), "", 10, nil)
+	events, err := m.GetUserEvents(context.Background(), common.NewApplicationId(1), [32]byte{}, 10, nil)
 	require.NoError(t, err)
 	assert.Nil(t, events)
 }
@@ -104,12 +111,12 @@ func TestMockClient_GetUserEvents_Empty(t *testing.T) {
 func TestMockClient_GetUserEvents_ReturnsAll(t *testing.T) {
 	appID := common.NewApplicationId(1)
 	m := NewMockClient().WithUserEvents(appID, []UserEvent{
-		{ApplicationID: appID, BlockNumber: 10, LogIndex: 1, EventSubType: "a"},
-		{ApplicationID: appID, BlockNumber: 10, LogIndex: 2, EventSubType: "a"},
-		{ApplicationID: appID, BlockNumber: 11, LogIndex: 0, EventSubType: "a"},
+		{ApplicationID: appID, BlockNumber: 10, LogIndex: 1, EventSubType: sub("a")},
+		{ApplicationID: appID, BlockNumber: 10, LogIndex: 2, EventSubType: sub("a")},
+		{ApplicationID: appID, BlockNumber: 11, LogIndex: 0, EventSubType: sub("a")},
 	})
 
-	events, err := m.GetUserEvents(context.Background(), appID, "", 100, nil)
+	events, err := m.GetUserEvents(context.Background(), appID, [32]byte{},100, nil)
 	require.NoError(t, err)
 	require.Len(t, events, 3)
 }
@@ -119,12 +126,12 @@ func TestMockClient_GetUserEvents_ReturnsAll(t *testing.T) {
 func TestMockClient_GetUserEvents_SortedDescending(t *testing.T) {
 	appID := common.NewApplicationId(1)
 	m := NewMockClient().WithUserEvents(appID, []UserEvent{
-		{ApplicationID: appID, BlockNumber: 5, LogIndex: 0, EventSubType: "a"},
-		{ApplicationID: appID, BlockNumber: 10, LogIndex: 0, EventSubType: "a"},
-		{ApplicationID: appID, BlockNumber: 7, LogIndex: 0, EventSubType: "a"},
+		{ApplicationID: appID, BlockNumber: 5, LogIndex: 0, EventSubType: sub("a")},
+		{ApplicationID: appID, BlockNumber: 10, LogIndex: 0, EventSubType: sub("a")},
+		{ApplicationID: appID, BlockNumber: 7, LogIndex: 0, EventSubType: sub("a")},
 	})
 
-	events, err := m.GetUserEvents(context.Background(), appID, "", 100, nil)
+	events, err := m.GetUserEvents(context.Background(), appID, [32]byte{},100, nil)
 	require.NoError(t, err)
 	require.Len(t, events, 3)
 
@@ -138,12 +145,12 @@ func TestMockClient_GetUserEvents_SortedDescending(t *testing.T) {
 func TestMockClient_GetUserEvents_Limit(t *testing.T) {
 	appID := common.NewApplicationId(1)
 	m := NewMockClient().WithUserEvents(appID, []UserEvent{
-		{ApplicationID: appID, BlockNumber: 1, EventSubType: "a"},
-		{ApplicationID: appID, BlockNumber: 2, EventSubType: "a"},
-		{ApplicationID: appID, BlockNumber: 3, EventSubType: "a"},
+		{ApplicationID: appID, BlockNumber: 1, EventSubType: sub("a")},
+		{ApplicationID: appID, BlockNumber: 2, EventSubType: sub("a")},
+		{ApplicationID: appID, BlockNumber: 3, EventSubType: sub("a")},
 	})
 
-	events, err := m.GetUserEvents(context.Background(), appID, "", 2, nil)
+	events, err := m.GetUserEvents(context.Background(), appID, [32]byte{},2, nil)
 	require.NoError(t, err)
 	assert.Len(t, events, 2)
 }
@@ -153,14 +160,14 @@ func TestMockClient_GetUserEvents_Limit(t *testing.T) {
 func TestMockClient_GetUserEvents_Before(t *testing.T) {
 	appID := common.NewApplicationId(1)
 	m := NewMockClient().WithUserEvents(appID, []UserEvent{
-		{ApplicationID: appID, BlockNumber: 5, LogIndex: 0, EventSubType: "a"},
-		{ApplicationID: appID, BlockNumber: 10, LogIndex: 0, EventSubType: "a"},
-		{ApplicationID: appID, BlockNumber: 15, LogIndex: 0, EventSubType: "a"},
+		{ApplicationID: appID, BlockNumber: 5, LogIndex: 0, EventSubType: sub("a")},
+		{ApplicationID: appID, BlockNumber: 10, LogIndex: 0, EventSubType: sub("a")},
+		{ApplicationID: appID, BlockNumber: 15, LogIndex: 0, EventSubType: sub("a")},
 	})
 
 	// Set before to block 10's sort key — should exclude blocks 10 and 15.
 	before := ComputeSortKey(UserEvent{BlockNumber: 10, LogIndex: 0})
-	events, err := m.GetUserEvents(context.Background(), appID, "", 100, before)
+	events, err := m.GetUserEvents(context.Background(), appID, [32]byte{},100, before)
 	require.NoError(t, err)
 	require.Len(t, events, 1)
 	assert.Equal(t, uint64(5), events[0].BlockNumber)
@@ -171,16 +178,16 @@ func TestMockClient_GetUserEvents_Before(t *testing.T) {
 func TestMockClient_GetUserEvents_EventSubTypeFilter(t *testing.T) {
 	appID := common.NewApplicationId(1)
 	m := NewMockClient().WithUserEvents(appID, []UserEvent{
-		{ApplicationID: appID, BlockNumber: 1, EventSubType: "deposit"},
-		{ApplicationID: appID, BlockNumber: 2, EventSubType: "withdrawal"},
-		{ApplicationID: appID, BlockNumber: 3, EventSubType: "deposit"},
+		{ApplicationID: appID, BlockNumber: 1, EventSubType: sub("deposit")},
+		{ApplicationID: appID, BlockNumber: 2, EventSubType: sub("withdrawal")},
+		{ApplicationID: appID, BlockNumber: 3, EventSubType: sub("deposit")},
 	})
 
-	events, err := m.GetUserEvents(context.Background(), appID, "deposit", 100, nil)
+	events, err := m.GetUserEvents(context.Background(), appID, sub("deposit"), 100, nil)
 	require.NoError(t, err)
 	require.Len(t, events, 2)
 	for _, ev := range events {
-		assert.Equal(t, "deposit", ev.EventSubType)
+		assert.Equal(t, sub("deposit"), ev.EventSubType)
 	}
 }
 
@@ -190,10 +197,10 @@ func TestMockClient_GetUserEvents_WrongAppID(t *testing.T) {
 	appID1 := common.NewApplicationId(1)
 	appID2 := common.NewApplicationId(2)
 	m := NewMockClient().WithUserEvents(appID1, []UserEvent{
-		{ApplicationID: appID1, BlockNumber: 1, EventSubType: "a"},
+		{ApplicationID: appID1, BlockNumber: 1, EventSubType: sub("a")},
 	})
 
-	events, err := m.GetUserEvents(context.Background(), appID2, "", 100, nil)
+	events, err := m.GetUserEvents(context.Background(), appID2, [32]byte{}, 100, nil)
 	require.NoError(t, err)
 	assert.Nil(t, events)
 }
@@ -203,26 +210,26 @@ func TestMockClient_GetUserEvents_WrongAppID(t *testing.T) {
 func TestMockClient_GetUserEvents_Pagination(t *testing.T) {
 	appID := common.NewApplicationId(1)
 	m := NewMockClient().WithUserEvents(appID, []UserEvent{
-		{ApplicationID: appID, BlockNumber: 5, LogIndex: 0, EventSubType: "a"},
-		{ApplicationID: appID, BlockNumber: 10, LogIndex: 0, EventSubType: "a"},
+		{ApplicationID: appID, BlockNumber: 5, LogIndex: 0, EventSubType: sub("a")},
+		{ApplicationID: appID, BlockNumber: 10, LogIndex: 0, EventSubType: sub("a")},
 	})
 
 	// First page: limit 1.
-	page1, err := m.GetUserEvents(context.Background(), appID, "", 1, nil)
+	page1, err := m.GetUserEvents(context.Background(), appID, [32]byte{},1, nil)
 	require.NoError(t, err)
 	require.Len(t, page1, 1)
 	assert.Equal(t, uint64(10), page1[0].BlockNumber)
 
 	// Second page: before the first page's sort key.
 	before := ComputeSortKey(page1[0])
-	page2, err := m.GetUserEvents(context.Background(), appID, "", 1, before)
+	page2, err := m.GetUserEvents(context.Background(), appID, [32]byte{},1, before)
 	require.NoError(t, err)
 	require.Len(t, page2, 1)
 	assert.Equal(t, uint64(5), page2[0].BlockNumber)
 
 	// Third page: before the second page's sort key — should be empty.
 	before = ComputeSortKey(page2[0])
-	page3, err := m.GetUserEvents(context.Background(), appID, "", 1, before)
+	page3, err := m.GetUserEvents(context.Background(), appID, [32]byte{},1, before)
 	require.NoError(t, err)
 	assert.Empty(t, page3)
 }
@@ -231,18 +238,19 @@ func TestMockClient_GetUserEvents_Pagination(t *testing.T) {
 // are filtered to those matching any of the provided subtypes.
 func TestMockClient_GetUserEventsBySubTypes_FiltersMultiple(t *testing.T) {
 	appID := common.NewApplicationId(1)
+	stA, stB, stC, stD := sub("aaa"), sub("bbb"), sub("ccc"), sub("ddd")
 	m := NewMockClient().WithUserEvents(appID, []UserEvent{
-		{ApplicationID: appID, BlockNumber: 1, EventSubType: "0xaaa"},
-		{ApplicationID: appID, BlockNumber: 2, EventSubType: "0xbbb"},
-		{ApplicationID: appID, BlockNumber: 3, EventSubType: "0xccc"},
-		{ApplicationID: appID, BlockNumber: 4, EventSubType: "0xddd"},
+		{ApplicationID: appID, BlockNumber: 1, EventSubType: stA},
+		{ApplicationID: appID, BlockNumber: 2, EventSubType: stB},
+		{ApplicationID: appID, BlockNumber: 3, EventSubType: stC},
+		{ApplicationID: appID, BlockNumber: 4, EventSubType: stD},
 	})
 
-	events, err := m.GetUserEventsBySubTypes(context.Background(), appID, []string{"0xaaa", "0xccc"}, 100, nil)
+	events, err := m.GetUserEventsBySubTypes(context.Background(), appID, [][32]byte{stA, stC}, 100, nil)
 	require.NoError(t, err)
 	require.Len(t, events, 2)
-	assert.Equal(t, "0xccc", events[0].EventSubType) // descending order
-	assert.Equal(t, "0xaaa", events[1].EventSubType)
+	assert.Equal(t, stC, events[0].EventSubType) // descending order
+	assert.Equal(t, stA, events[1].EventSubType)
 }
 
 // TestMockClient_GetUserEventsBySubTypes_EmptySlice returns all events when
@@ -250,8 +258,8 @@ func TestMockClient_GetUserEventsBySubTypes_FiltersMultiple(t *testing.T) {
 func TestMockClient_GetUserEventsBySubTypes_EmptySlice(t *testing.T) {
 	appID := common.NewApplicationId(1)
 	m := NewMockClient().WithUserEvents(appID, []UserEvent{
-		{ApplicationID: appID, BlockNumber: 1, EventSubType: "0xaaa"},
-		{ApplicationID: appID, BlockNumber: 2, EventSubType: "0xbbb"},
+		{ApplicationID: appID, BlockNumber: 1, EventSubType: sub("aaa")},
+		{ApplicationID: appID, BlockNumber: 2, EventSubType: sub("bbb")},
 	})
 
 	events, err := m.GetUserEventsBySubTypes(context.Background(), appID, nil, 100, nil)
@@ -262,18 +270,70 @@ func TestMockClient_GetUserEventsBySubTypes_EmptySlice(t *testing.T) {
 // TestMockClient_GetUserEventsBySubTypes_Before verifies pagination with subtypes.
 func TestMockClient_GetUserEventsBySubTypes_Before(t *testing.T) {
 	appID := common.NewApplicationId(1)
+	stA, stB := sub("aaa"), sub("bbb")
 	m := NewMockClient().WithUserEvents(appID, []UserEvent{
-		{ApplicationID: appID, BlockNumber: 5, LogIndex: 0, EventSubType: "0xaaa"},
-		{ApplicationID: appID, BlockNumber: 10, LogIndex: 0, EventSubType: "0xaaa"},
-		{ApplicationID: appID, BlockNumber: 15, LogIndex: 0, EventSubType: "0xbbb"},
+		{ApplicationID: appID, BlockNumber: 5, LogIndex: 0, EventSubType: stA},
+		{ApplicationID: appID, BlockNumber: 10, LogIndex: 0, EventSubType: stA},
+		{ApplicationID: appID, BlockNumber: 15, LogIndex: 0, EventSubType: stB},
 	})
 
 	before := ComputeSortKey(UserEvent{BlockNumber: 15, LogIndex: 0})
-	events, err := m.GetUserEventsBySubTypes(context.Background(), appID, []string{"0xaaa", "0xbbb"}, 100, before)
+	events, err := m.GetUserEventsBySubTypes(context.Background(), appID, [][32]byte{stA, stB}, 100, before)
 	require.NoError(t, err)
 	require.Len(t, events, 2)
 	assert.Equal(t, uint64(10), events[0].BlockNumber)
 	assert.Equal(t, uint64(5), events[1].BlockNumber)
+}
+
+// TestMockClient_GetAppEvents_ReturnsAll verifies that registered AppEvents
+// are returned when no filter is applied.
+func TestMockClient_GetAppEvents_ReturnsAll(t *testing.T) {
+	appID := common.NewApplicationId(1)
+	m := NewMockClient().WithAppEvents(appID, []AppEvent{
+		{ApplicationID: appID, BlockNumber: 10, LogIndex: 1, EventSubType: sub("a")},
+		{ApplicationID: appID, BlockNumber: 11, LogIndex: 0, EventSubType: sub("b")},
+	})
+
+	events, err := m.GetAppEvents(context.Background(), appID, [32]byte{}, 100, nil)
+	require.NoError(t, err)
+	require.Len(t, events, 2)
+	assert.Equal(t, uint64(11), events[0].BlockNumber) // descending
+}
+
+// TestMockClient_GetAppEvents_EventSubTypeFilter verifies subtype filtering.
+func TestMockClient_GetAppEvents_EventSubTypeFilter(t *testing.T) {
+	appID := common.NewApplicationId(1)
+	receipt := sub("receipt")
+	m := NewMockClient().WithAppEvents(appID, []AppEvent{
+		{ApplicationID: appID, BlockNumber: 1, EventSubType: receipt, Data: []byte("r1")},
+		{ApplicationID: appID, BlockNumber: 2, EventSubType: sub("other"), Data: []byte("o1")},
+		{ApplicationID: appID, BlockNumber: 3, EventSubType: receipt, Data: []byte("r2")},
+	})
+
+	events, err := m.GetAppEvents(context.Background(), appID, receipt, 100, nil)
+	require.NoError(t, err)
+	require.Len(t, events, 2)
+	for _, ev := range events {
+		assert.Equal(t, receipt, ev.EventSubType)
+	}
+}
+
+// TestMockClient_GetAppEventsBySubTypes_FiltersMultiple verifies that AppEvents
+// are filtered to those matching any of the provided subtypes.
+func TestMockClient_GetAppEventsBySubTypes_FiltersMultiple(t *testing.T) {
+	appID := common.NewApplicationId(1)
+	stA, stB, stC := sub("aaa"), sub("bbb"), sub("ccc")
+	m := NewMockClient().WithAppEvents(appID, []AppEvent{
+		{ApplicationID: appID, BlockNumber: 1, EventSubType: stA},
+		{ApplicationID: appID, BlockNumber: 2, EventSubType: stB},
+		{ApplicationID: appID, BlockNumber: 3, EventSubType: stC},
+	})
+
+	events, err := m.GetAppEventsBySubTypes(context.Background(), appID, [][32]byte{stA, stC}, 100, nil)
+	require.NoError(t, err)
+	require.Len(t, events, 2)
+	assert.Equal(t, stC, events[0].EventSubType) // descending order
+	assert.Equal(t, stA, events[1].EventSubType)
 }
 
 // TestMockClient_ImplementsClientInterface verifies that *MockClient satisfies
