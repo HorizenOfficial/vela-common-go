@@ -131,7 +131,7 @@ The framework (`vela`) and the WASM apps live in separate type worlds connected 
 - **Host-side types** (framework): `ethCommon.Address`, `*common.Big`, `common.Event`, `common.Withdrawal`
 - **Guest-side types** (this library): `types.Address`, `*types.Uint256`, `types.PlainEvent`, `types.AppEvent`, `types.Withdrawal`
 - **App-specific event types** (each app): `DepositEvent`, `SenderEvent`, `RecipientEvent`, `WithdrawalEvent` — defined locally in each WASM app's `app/types.go` using guest-side types. Host-side test code defines its own mirror types using `*common.Big` / `ethCommon.Address` for JSON deserialization of the same events.
-- **AppEvent** (`types.AppEvent`): application-level event with `EventSubType` and `Data`. Unlike `PlainEvent`, it has no `UserID` — it is not user-directed and not encrypted by the executor. The host converts `EventSubType` (string) to `bytes32` at the serialization boundary for on-chain emission.
+- **AppEvent** (`types.AppEvent`): application-level event with `EventSubType` and `Data`. Unlike `PlainEvent`, it has no `UserID` — it is not user-directed and not encrypted by the executor. `EventSubType` is `[32]byte` end-to-end (guest, host, signature hash, on-chain `bytes32`) — no ASCII/hex re-encoding at the serialization boundary. How the 32 bytes are produced is a per-application policy (short ASCII tag packed with `copy(b[:], s)`, keccak256, HMAC from a user seed, etc.).
 
 The framework never imports app-specific types. Framework test helpers (`pkg/testutil`) validate events as opaque JSON (`json.Valid()`), not by deserializing into app-specific structs. App-specific event validation belongs in each app's own system tests.
 

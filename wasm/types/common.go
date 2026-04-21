@@ -7,15 +7,15 @@ const (
 
 // PlainEvent is a local replacement for common.PlainEvent
 type PlainEvent struct {
-	UserID       Address `json:"userId"`
-	EventSubType string  `json:"eventSubType"`
-	Data         []byte  `json:"data"`
+	UserID       Address  `json:"userId"`
+	EventSubType [32]byte `json:"eventSubType"`
+	Data         []byte   `json:"data"`
 }
 
 // AppEvent is a local replacement for common.AppEvent (application-level, non-encrypted event)
 type AppEvent struct {
-	EventSubType string `json:"eventSubType"`
-	Data         []byte `json:"data"`
+	EventSubType [32]byte `json:"eventSubType"`
+	Data         []byte   `json:"data"`
 }
 
 // Withdrawal is a local replacement for common.Withdrawal
