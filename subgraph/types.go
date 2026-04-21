@@ -20,6 +20,8 @@ type Client interface {
 	GetDeployRequestCompletedByID(ctx context.Context, requestID common.RequestIdType) (*RequestCompleted, error)
 	GetUserEvents(ctx context.Context, applicationID common.ApplicationIdType, eventSubType [32]byte, limit int, before *big.Int) ([]UserEvent, error)
 	GetUserEventsBySubTypes(ctx context.Context, applicationID common.ApplicationIdType, eventSubTypes [][32]byte, limit int, before *big.Int) ([]UserEvent, error)
+	GetAppEvents(ctx context.Context, applicationID common.ApplicationIdType, eventSubType [32]byte, limit int, before *big.Int) ([]AppEvent, error)
+	GetAppEventsBySubTypes(ctx context.Context, applicationID common.ApplicationIdType, eventSubTypes [][32]byte, limit int, before *big.Int) ([]AppEvent, error)
 	GetRefunds(ctx context.Context, applicationID common.ApplicationIdType, requestID *common.RequestIdType, limit int) ([]OnChainRefund, error)
 	GetWithdrawals(ctx context.Context, applicationID common.ApplicationIdType, requestID *common.RequestIdType, limit int) ([]OnChainWithdrawal, error)
 	GetClaimsExecuted(ctx context.Context, payee ethCommon.Address, tokenAddress *ethCommon.Address, limit int) ([]ClaimExecuted, error)
@@ -47,6 +49,19 @@ type UserEvent struct {
 	BlockNumber   uint64
 	LogIndex      uint64
 	SortKey       *big.Int
+}
+
+// AppEvent is the projection returned by the subgraph for application-level
+// (non-encrypted, non-user-directed) events.
+type AppEvent struct {
+	ApplicationID common.ApplicationIdType
+	RequestID     common.RequestIdType
+	// EventSubType is the raw 32-byte value of the on-chain bytes32 topic.
+	EventSubType [32]byte
+	Data         []byte
+	BlockNumber  uint64
+	LogIndex     uint64
+	SortKey      *big.Int
 }
 
 // OnChainRefund represents a Refund event indexed by the subgraph.

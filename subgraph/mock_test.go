@@ -285,6 +285,57 @@ func TestMockClient_GetUserEventsBySubTypes_Before(t *testing.T) {
 	assert.Equal(t, uint64(5), events[1].BlockNumber)
 }
 
+// TestMockClient_GetAppEvents_ReturnsAll verifies that registered AppEvents
+// are returned when no filter is applied.
+func TestMockClient_GetAppEvents_ReturnsAll(t *testing.T) {
+	appID := common.NewApplicationId(1)
+	m := NewMockClient().WithAppEvents(appID, []AppEvent{
+		{ApplicationID: appID, BlockNumber: 10, LogIndex: 1, EventSubType: sub("a")},
+		{ApplicationID: appID, BlockNumber: 11, LogIndex: 0, EventSubType: sub("b")},
+	})
+
+	events, err := m.GetAppEvents(context.Background(), appID, [32]byte{}, 100, nil)
+	require.NoError(t, err)
+	require.Len(t, events, 2)
+	assert.Equal(t, uint64(11), events[0].BlockNumber) // descending
+}
+
+// TestMockClient_GetAppEvents_EventSubTypeFilter verifies subtype filtering.
+func TestMockClient_GetAppEvents_EventSubTypeFilter(t *testing.T) {
+	appID := common.NewApplicationId(1)
+	receipt := sub("receipt")
+	m := NewMockClient().WithAppEvents(appID, []AppEvent{
+		{ApplicationID: appID, BlockNumber: 1, EventSubType: receipt, Data: []byte("r1")},
+		{ApplicationID: appID, BlockNumber: 2, EventSubType: sub("other"), Data: []byte("o1")},
+		{ApplicationID: appID, BlockNumber: 3, EventSubType: receipt, Data: []byte("r2")},
+	})
+
+	events, err := m.GetAppEvents(context.Background(), appID, receipt, 100, nil)
+	require.NoError(t, err)
+	require.Len(t, events, 2)
+	for _, ev := range events {
+		assert.Equal(t, receipt, ev.EventSubType)
+	}
+}
+
+// TestMockClient_GetAppEventsBySubTypes_FiltersMultiple verifies that AppEvents
+// are filtered to those matching any of the provided subtypes.
+func TestMockClient_GetAppEventsBySubTypes_FiltersMultiple(t *testing.T) {
+	appID := common.NewApplicationId(1)
+	stA, stB, stC := sub("aaa"), sub("bbb"), sub("ccc")
+	m := NewMockClient().WithAppEvents(appID, []AppEvent{
+		{ApplicationID: appID, BlockNumber: 1, EventSubType: stA},
+		{ApplicationID: appID, BlockNumber: 2, EventSubType: stB},
+		{ApplicationID: appID, BlockNumber: 3, EventSubType: stC},
+	})
+
+	events, err := m.GetAppEventsBySubTypes(context.Background(), appID, [][32]byte{stA, stC}, 100, nil)
+	require.NoError(t, err)
+	require.Len(t, events, 2)
+	assert.Equal(t, stC, events[0].EventSubType) // descending order
+	assert.Equal(t, stA, events[1].EventSubType)
+}
+
 // TestMockClient_ImplementsClientInterface verifies that *MockClient satisfies
 // the Client interface at compile time.
 func TestMockClient_ImplementsClientInterface(t *testing.T) {

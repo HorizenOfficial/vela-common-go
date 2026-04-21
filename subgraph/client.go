@@ -315,6 +315,133 @@ func parseUserEventEntities(applicationID common.ApplicationIdType, entities []u
 	return events, nil
 }
 
+type appEventEntity struct {
+	ApplicationID string `json:"applicationId"`
+	RequestID     string `json:"requestId"`
+	EventSubType  string `json:"eventSubType"`
+	Data          string `json:"data"`
+	BlockNumber   string `json:"blockNumber"`
+	LogIndex      string `json:"logIndex"`
+	SortKey       string `json:"sortKey"`
+}
+
+type appEventsResponse struct {
+	AppEvents []appEventEntity `json:"appEvents"`
+}
+
+func (c *client) GetAppEvents(ctx context.Context, applicationID common.ApplicationIdType, eventSubType [32]byte, limit int, before *big.Int) ([]AppEvent, error) {
+	var subTypes [][32]byte
+	if eventSubType != ([32]byte{}) {
+		subTypes = [][32]byte{eventSubType}
+	}
+	return c.GetAppEventsBySubTypes(ctx, applicationID, subTypes, limit, before)
+}
+
+func (c *client) GetAppEventsBySubTypes(ctx context.Context, applicationID common.ApplicationIdType, eventSubTypes [][32]byte, limit int, before *big.Int) ([]AppEvent, error) {
+	if limit <= 0 {
+		limit = 10
+	}
+	if limit > 1000 {
+		limit = 1000
+	}
+
+	variables := map[string]interface{}{
+		"applicationId": fmt.Sprintf("%d", uint64(applicationID)),
+		"limit":         limit,
+	}
+
+	varDefs := ""
+	whereParts := []string{"applicationId: $applicationId"}
+	if len(eventSubTypes) > 0 {
+		hexSubTypes := make([]string, len(eventSubTypes))
+		for i, st := range eventSubTypes {
+			hexSubTypes[i] = "0x" + hex.EncodeToString(st[:])
+		}
+		varDefs += ", $eventSubTypes: [Bytes!]!"
+		variables["eventSubTypes"] = hexSubTypes
+		whereParts = append(whereParts, "eventSubType_in: $eventSubTypes")
+	}
+	if before != nil {
+		varDefs += ", $before: BigInt!"
+		variables["before"] = before.String()
+		whereParts = append(whereParts, "sortKey_lt: $before")
+	}
+
+	query := fmt.Sprintf(`
+query($applicationId: BigInt!, $limit: Int!%s) {
+  appEvents(
+    where: { %s }
+    orderBy: sortKey
+    orderDirection: desc
+    first: $limit
+  ) {
+    applicationId
+    requestId
+    eventSubType
+    data
+    blockNumber
+    logIndex
+    sortKey
+  }
+}`, varDefs, strings.Join(whereParts, ", "))
+
+	var resp graphResponse[appEventsResponse]
+	if err := c.doGraphQL(ctx, query, variables, &resp); err != nil {
+		return nil, err
+	}
+	if len(resp.Errors) > 0 {
+		return nil, fmt.Errorf("subgraph returned errors: %v", resp.Errors[0].Message)
+	}
+
+	return parseAppEventEntities(applicationID, resp.Data.AppEvents)
+}
+
+func parseAppEventEntities(applicationID common.ApplicationIdType, entities []appEventEntity) ([]AppEvent, error) {
+	events := make([]AppEvent, 0, len(entities))
+	for _, entity := range entities {
+		reqID, err := parseRequestID(entity.RequestID)
+		if err != nil {
+			return nil, fmt.Errorf("invalid requestId %q: %w", entity.RequestID, err)
+		}
+
+		data, err := decodeHex(entity.Data)
+		if err != nil {
+			return nil, fmt.Errorf("invalid data for request %s: %w", reqID.String(), err)
+		}
+
+		subType, err := decodeSubType(entity.EventSubType)
+		if err != nil {
+			return nil, fmt.Errorf("invalid eventSubType for request %s: %w", reqID.String(), err)
+		}
+
+		blockNumber, err := strconv.ParseUint(entity.BlockNumber, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("invalid blockNumber %q: %w", entity.BlockNumber, err)
+		}
+
+		logIndex, err := strconv.ParseUint(entity.LogIndex, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("invalid logIndex %q: %w", entity.LogIndex, err)
+		}
+
+		sortKey, ok := stringToBigInt(entity.SortKey)
+		if !ok {
+			return nil, fmt.Errorf("invalid sortKey %q", entity.SortKey)
+		}
+
+		events = append(events, AppEvent{
+			ApplicationID: applicationID,
+			RequestID:     reqID,
+			EventSubType:  subType,
+			Data:          data,
+			BlockNumber:   blockNumber,
+			LogIndex:      logIndex,
+			SortKey:       sortKey,
+		})
+	}
+	return events, nil
+}
+
 // decodeSubType parses an "0x"-prefixed hex string (up to 32 bytes, per the
 // on-chain bytes32 topic) into a [32]byte. Shorter hex values are left-aligned
 // and zero-padded on the right, matching how Solidity emits bytes32.

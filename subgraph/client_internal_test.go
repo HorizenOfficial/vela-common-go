@@ -556,3 +556,37 @@ func TestClient_GetUserEvents_Empty(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, events)
 }
+
+// TestClient_GetAppEvents_ParsesResponse verifies that the client correctly
+// parses a subgraph appEvents response into AppEvent structs.
+func TestClient_GetAppEvents_ParsesResponse(t *testing.T) {
+	srv := fakeSubgraph(t, 200, map[string]interface{}{
+		"data": map[string]interface{}{
+			"appEvents": []map[string]interface{}{
+				{
+					"applicationId": "1",
+					"requestId":     "0x0000000000000000000000000000000000000000000000000000000000000001",
+					"eventSubType":  "0xdeadbeef",
+					"data":          "0xcafe",
+					"blockNumber":   "100",
+					"logIndex":      "3",
+					"sortKey":       "100000000000003",
+				},
+			},
+		},
+	})
+
+	c := NewClient(srv.URL)
+	appID := common.NewApplicationId(1)
+	events, err := c.GetAppEvents(context.Background(), appID, [32]byte{}, 10, nil)
+	require.NoError(t, err)
+	require.Len(t, events, 1)
+
+	expectedSubType := [32]byte{0xde, 0xad, 0xbe, 0xef}
+	ev := events[0]
+	assert.Equal(t, appID, ev.ApplicationID)
+	assert.Equal(t, expectedSubType, ev.EventSubType)
+	assert.Equal(t, []byte{0xca, 0xfe}, ev.Data)
+	assert.Equal(t, uint64(100), ev.BlockNumber)
+	assert.Equal(t, uint64(3), ev.LogIndex)
+}
