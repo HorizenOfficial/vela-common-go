@@ -44,8 +44,9 @@ Each top-level directory is an independent domain of shared code:
 
 ```
 vela-common-go/
-├── common/        # Shared framework types (ApplicationIdType, RequestIdType, etc.)
+├── common/        # Shared framework types (ApplicationIdType, RequestIdType, DeployDescriptor, etc.)
 ├── subgraph/      # GraphQL client for The Graph subgraph
+├── subtypes/      # HMAC-derived privacy-preserving event subtypes
 ├── wasm/          # WASM guest types and utilities
 │   ├── types/     # Uint256, Address, result types, helpers
 │   └── utils/     # Memory allocation, logging
@@ -57,18 +58,33 @@ New top-level directories should follow the same pattern: sub-packages grouped b
 ### Common Package Structure
 
 **`common/`** - Shared framework types used by both `vela` and `vela-nova`:
-- `ApplicationIdType` - Application identifier (`uint64`). `NewApplicationId` takes `uint64`. `vela/pkg/common` re-exports this as a type alias for backward compatibility.
+- `ApplicationIdType` - Application identifier (`uint64`). `NewApplicationId` takes `uint64`. `vela/pkg/common` re-exports this as a type alias for backward compatibility. JSON serializes as a quoted decimal string to avoid float64 precision loss for values above 2^53; `UnmarshalJSON` also accepts raw JSON numbers for backward compatibility.
 - `RequestIdType` - 32-byte request identifier with hex JSON serialization
 - `RequestResultStatus` - Request outcome enum (`RequestResultOK`, `RequestResultFailed`, `RequestResultUnknown`)
+- `ConstructorParams` - Alias for `json.RawMessage`, used for guest deploy constructor params
+- `DeployDescriptor` / `DeployModeArtifactRef` - v1 deploy payload wire contract stored in `Request.Payload`, shared between the wallet (producer) and the framework (consumer)
 
 ### Subgraph Package Structure
 
 **`subgraph/`** - GraphQL client for querying The Graph subgraph:
-- `Client` interface - `HealthCheck`, `GetRequestCompletedByID`, `GetUserEvents`
-- `RequestCompleted`, `UserEvent` - Projection types returned by queries
+- `Client` interface:
+  - `HealthCheck`
+  - `GetRequestCompletedByID` / `GetDeployRequestCompletedByID`
+  - `GetUserEvents` / `GetUserEventsBySubTypes` - user-directed encrypted events, optionally filtered by one or more `[32]byte` subtypes
+  - `GetAppEvents` / `GetAppEventsBySubTypes` - application-level (non-encrypted) events, same subtype filtering
+  - `GetRefunds` / `GetWithdrawals` - on-chain ERC-20 refunds / withdrawals by application (and optionally request)
+  - `GetClaimsExecuted` - PaymentWithdrawn claim events by payee (and optionally token address)
+- Projection types: `RequestCompleted`, `UserEvent`, `AppEvent`, `OnChainRefund`, `OnChainWithdrawal`, `ClaimExecuted`
+- `EventSubType` values are passed as `[32]byte` (zero value = "no filter") and serialized to `0x`-prefixed hex by the client
 - `NewClient` - Client constructor
-- `MockClient` - Test double with builder pattern (`WithRequestCompleted`, `WithUserEvents`)
+- `MockClient` - Test double with builder pattern (`WithRequestCompleted`, `WithUserEvents`, etc.)
 - `ComputeSortKey` - Sort key computation for event pagination
+
+### Subtypes Package Structure
+
+**`subtypes/`** - Privacy-preserving event subtype generation:
+- `GenerateSubtypes(seed)` / `GenerateSubtypesN(seed, n)` - Derive `n` deterministic `[32]byte` subtypes from a seed as `HMAC-SHA256(key=seed, data=byte(index))` for `index` in `[1, n]`. The raw 32 bytes match the on-chain `bytes32` event subtype — no hex re-encoding at the boundary.
+- `DefaultSubtypeN` - Default number of subtypes generated (`50`).
 
 ### WASM Sandbox Design
 
