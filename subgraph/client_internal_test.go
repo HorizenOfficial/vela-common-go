@@ -272,6 +272,7 @@ func TestClient_GetRequestCompletedByID_Found(t *testing.T) {
 		"data": map[string]interface{}{
 			"requestCompleteds": []map[string]interface{}{
 				{
+					"applicationId":   "7",
 					"requestId":       "0x0000000000000000000000000000000000000000000000000000000000000001",
 					"status":          "0",
 					"errorCode":       "0",
@@ -287,6 +288,7 @@ func TestClient_GetRequestCompletedByID_Found(t *testing.T) {
 	rc, err := c.GetRequestCompletedByID(context.Background(), reqID)
 	require.NoError(t, err)
 	require.NotNil(t, rc)
+	assert.Equal(t, common.NewApplicationId(7), rc.ApplicationID)
 	assert.Equal(t, reqID, rc.RequestID)
 	assert.Equal(t, common.RequestResultOK, rc.Status)
 	assert.Equal(t, uint8(0), rc.ErrorCode)
@@ -338,6 +340,113 @@ func TestClient_GetRequestCompletedByID_FailedStatus(t *testing.T) {
 	assert.Equal(t, "something went wrong", rc.ErrorMessage)
 }
 
+// TestClient_GetRequestCompletedByID_MissingApplicationID verifies that a
+// response without applicationId defaults to zero (backward compatibility).
+func TestClient_GetRequestCompletedByID_MissingApplicationID(t *testing.T) {
+	var reqID common.RequestIdType
+	reqID[31] = 1
+
+	srv := fakeSubgraph(t, 200, map[string]interface{}{
+		"data": map[string]interface{}{
+			"requestCompleteds": []map[string]interface{}{
+				{
+					"requestId":       "0x0000000000000000000000000000000000000000000000000000000000000001",
+					"status":          "0",
+					"errorCode":       "0",
+					"errorMessage":    "",
+					"applicationFees": "0",
+					"blockNumber":     "1",
+				},
+			},
+		},
+	})
+
+	c := NewClient(srv.URL)
+	rc, err := c.GetRequestCompletedByID(context.Background(), reqID)
+	require.NoError(t, err)
+	require.NotNil(t, rc)
+	assert.Equal(t, common.ApplicationIdType(0), rc.ApplicationID)
+}
+
+// TestClient_GetDeployRequestCompletedByID_Found verifies successful parsing
+// of a DeployRequestCompleted entity from the subgraph response.
+func TestClient_GetDeployRequestCompletedByID_Found(t *testing.T) {
+	var reqID common.RequestIdType
+	reqID[31] = 2
+
+	srv := fakeSubgraph(t, 200, map[string]interface{}{
+		"data": map[string]interface{}{
+			"deployRequestCompleteds": []map[string]interface{}{
+				{
+					"applicationId":   "42",
+					"requestId":       "0x0000000000000000000000000000000000000000000000000000000000000002",
+					"status":          "0",
+					"errorCode":       "0",
+					"errorMessage":    "",
+					"applicationFees": "500",
+					"blockNumber":     "99",
+				},
+			},
+		},
+	})
+
+	c := NewClient(srv.URL)
+	rc, err := c.GetDeployRequestCompletedByID(context.Background(), reqID)
+	require.NoError(t, err)
+	require.NotNil(t, rc)
+	assert.Equal(t, common.NewApplicationId(42), rc.ApplicationID)
+	assert.Equal(t, reqID, rc.RequestID)
+	assert.Equal(t, common.RequestResultOK, rc.Status)
+	assert.Equal(t, big.NewInt(500), rc.ApplicationFees)
+	assert.Equal(t, uint64(99), rc.BlockNumber)
+}
+
+// TestClient_GetDeployRequestCompletedByID_NotFound verifies that an empty
+// result set returns nil without error.
+func TestClient_GetDeployRequestCompletedByID_NotFound(t *testing.T) {
+	srv := fakeSubgraph(t, 200, map[string]interface{}{
+		"data": map[string]interface{}{
+			"deployRequestCompleteds": []map[string]interface{}{},
+		},
+	})
+
+	c := NewClient(srv.URL)
+	rc, err := c.GetDeployRequestCompletedByID(context.Background(), common.RequestIdType{})
+	require.NoError(t, err)
+	assert.Nil(t, rc)
+}
+
+// TestClient_GetDeployRequestCompletedByID_FailedStatus verifies that
+// status=1 is mapped to RequestResultFailed with error details.
+func TestClient_GetDeployRequestCompletedByID_FailedStatus(t *testing.T) {
+	srv := fakeSubgraph(t, 200, map[string]interface{}{
+		"data": map[string]interface{}{
+			"deployRequestCompleteds": []map[string]interface{}{
+				{
+					"applicationId":   "10",
+					"requestId":       "0x0000000000000000000000000000000000000000000000000000000000000001",
+					"status":          "1",
+					"errorCode":       "3",
+					"errorMessage":    "deploy failed",
+					"applicationFees": "0",
+					"blockNumber":     "50",
+				},
+			},
+		},
+	})
+
+	c := NewClient(srv.URL)
+	var reqID common.RequestIdType
+	reqID[31] = 1
+	rc, err := c.GetDeployRequestCompletedByID(context.Background(), reqID)
+	require.NoError(t, err)
+	require.NotNil(t, rc)
+	assert.Equal(t, common.NewApplicationId(10), rc.ApplicationID)
+	assert.Equal(t, common.RequestResultFailed, rc.Status)
+	assert.Equal(t, uint8(3), rc.ErrorCode)
+	assert.Equal(t, "deploy failed", rc.ErrorMessage)
+}
+
 // TestClient_GetUserEvents_ParsesResponse verifies that the client correctly
 // parses a subgraph userEvents response into UserEvent structs.
 func TestClient_GetUserEvents_ParsesResponse(t *testing.T) {
@@ -347,7 +456,7 @@ func TestClient_GetUserEvents_ParsesResponse(t *testing.T) {
 				{
 					"applicationId": "1",
 					"requestId":     "0x0000000000000000000000000000000000000000000000000000000000000001",
-					"eventSubType":  "deposit",
+					"eventSubType":  "0xdeadbeef",
 					"encryptedData": "0xcafe",
 					"blockNumber":   "100",
 					"logIndex":      "3",
@@ -359,13 +468,14 @@ func TestClient_GetUserEvents_ParsesResponse(t *testing.T) {
 
 	c := NewClient(srv.URL)
 	appID := common.NewApplicationId(1)
-	events, err := c.GetUserEvents(context.Background(), appID, "", 10, nil)
+	events, err := c.GetUserEvents(context.Background(), appID, [32]byte{}, 10, nil)
 	require.NoError(t, err)
 	require.Len(t, events, 1)
 
+	expectedSubType := [32]byte{0xde, 0xad, 0xbe, 0xef}
 	ev := events[0]
 	assert.Equal(t, appID, ev.ApplicationID)
-	assert.Equal(t, "deposit", ev.EventSubType)
+	assert.Equal(t, expectedSubType, ev.EventSubType)
 	assert.Equal(t, []byte{0xca, 0xfe}, ev.EncryptedData)
 	assert.Equal(t, uint64(100), ev.BlockNumber)
 	assert.Equal(t, uint64(3), ev.LogIndex)
@@ -373,6 +483,63 @@ func TestClient_GetUserEvents_ParsesResponse(t *testing.T) {
 	var expectedReqID common.RequestIdType
 	expectedReqID[31] = 1
 	assert.Equal(t, expectedReqID, ev.RequestID)
+}
+
+// TestClient_GetUserEventsBySubTypes_ParsesResponse verifies that the client
+// correctly builds the eventSubType_in filter and parses the response.
+func TestClient_GetUserEventsBySubTypes_ParsesResponse(t *testing.T) {
+	srv := fakeSubgraph(t, 200, map[string]interface{}{
+		"data": map[string]interface{}{
+			"userEvents": []map[string]interface{}{
+				{
+					"applicationId": "1",
+					"requestId":     "0x0000000000000000000000000000000000000000000000000000000000000001",
+					"eventSubType":  "0xaabbcc",
+					"encryptedData": "0xcafe",
+					"blockNumber":   "100",
+					"logIndex":      "3",
+					"sortKey":       "100000000000003",
+				},
+				{
+					"applicationId": "1",
+					"requestId":     "0x0000000000000000000000000000000000000000000000000000000000000002",
+					"eventSubType":  "0xddeeff",
+					"encryptedData": "0xbeef",
+					"blockNumber":   "101",
+					"logIndex":      "0",
+					"sortKey":       "101000000000000",
+				},
+			},
+		},
+	})
+
+	c := NewClient(srv.URL)
+	appID := common.NewApplicationId(1)
+	var stAABBCC [32]byte
+	stAABBCC[0], stAABBCC[1], stAABBCC[2] = 0xaa, 0xbb, 0xcc
+	var stDDEEFF [32]byte
+	stDDEEFF[0], stDDEEFF[1], stDDEEFF[2] = 0xdd, 0xee, 0xff
+	events, err := c.GetUserEventsBySubTypes(context.Background(), appID, [][32]byte{stAABBCC, stDDEEFF}, 10, nil)
+	require.NoError(t, err)
+	require.Len(t, events, 2)
+
+	assert.Equal(t, stAABBCC, events[0].EventSubType)
+	assert.Equal(t, stDDEEFF, events[1].EventSubType)
+}
+
+// TestClient_GetUserEventsBySubTypes_Empty verifies that an empty subtype
+// list returns all events (no eventSubType filter applied).
+func TestClient_GetUserEventsBySubTypes_Empty(t *testing.T) {
+	srv := fakeSubgraph(t, 200, map[string]interface{}{
+		"data": map[string]interface{}{
+			"userEvents": []map[string]interface{}{},
+		},
+	})
+
+	c := NewClient(srv.URL)
+	events, err := c.GetUserEventsBySubTypes(context.Background(), common.NewApplicationId(1), nil, 10, nil)
+	require.NoError(t, err)
+	assert.Empty(t, events)
 }
 
 // TestClient_GetUserEvents_Empty verifies that an empty result set returns
@@ -385,7 +552,41 @@ func TestClient_GetUserEvents_Empty(t *testing.T) {
 	})
 
 	c := NewClient(srv.URL)
-	events, err := c.GetUserEvents(context.Background(), common.NewApplicationId(1), "", 10, nil)
+	events, err := c.GetUserEvents(context.Background(), common.NewApplicationId(1), [32]byte{}, 10, nil)
 	require.NoError(t, err)
 	assert.Empty(t, events)
+}
+
+// TestClient_GetAppEvents_ParsesResponse verifies that the client correctly
+// parses a subgraph appEvents response into AppEvent structs.
+func TestClient_GetAppEvents_ParsesResponse(t *testing.T) {
+	srv := fakeSubgraph(t, 200, map[string]interface{}{
+		"data": map[string]interface{}{
+			"appEvents": []map[string]interface{}{
+				{
+					"applicationId": "1",
+					"requestId":     "0x0000000000000000000000000000000000000000000000000000000000000001",
+					"eventSubType":  "0xdeadbeef",
+					"data":          "0xcafe",
+					"blockNumber":   "100",
+					"logIndex":      "3",
+					"sortKey":       "100000000000003",
+				},
+			},
+		},
+	})
+
+	c := NewClient(srv.URL)
+	appID := common.NewApplicationId(1)
+	events, err := c.GetAppEvents(context.Background(), appID, [32]byte{}, 10, nil)
+	require.NoError(t, err)
+	require.Len(t, events, 1)
+
+	expectedSubType := [32]byte{0xde, 0xad, 0xbe, 0xef}
+	ev := events[0]
+	assert.Equal(t, appID, ev.ApplicationID)
+	assert.Equal(t, expectedSubType, ev.EventSubType)
+	assert.Equal(t, []byte{0xca, 0xfe}, ev.Data)
+	assert.Equal(t, uint64(100), ev.BlockNumber)
+	assert.Equal(t, uint64(3), ev.LogIndex)
 }

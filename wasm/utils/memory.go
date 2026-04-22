@@ -107,9 +107,16 @@ func GetAllocatedMemoryStats() (mapSize, totalBytes int64) {
 // --- Helper Functions for Data Translation ---
 
 // PtrToString converts a WASM pointer and length to a Go string.
+// (nil, 0) is the legitimate empty case (complement of BytesToPtr returning nil
+// for empty input) and returns "" silently. Inconsistent combinations
+// (nil ptr with non-zero length, or non-nil ptr with zero length) and negative
+// lengths are logged as warnings.
 func PtrToString(ptr *byte, length int32) string {
-	if ptr == nil || length <= 0 {
+	if length < 0 || (ptr == nil) != (length == 0) {
 		LogWarn("Invalid ptr or length, ptr=%v, length=%d", ptr, length)
+		return ""
+	}
+	if length == 0 {
 		return ""
 	}
 	return string(unsafe.Slice(ptr, length))
