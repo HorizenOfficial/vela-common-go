@@ -4,6 +4,9 @@
 
 This feature adds opt-in privacy for event subtypes. Users can submit a **seed** (a 65-byte random value, transmitted as a 93-byte AES-256-GCM encrypted envelope) alongside their P521 public key during the `ASSOCIATEKEY` request. When a seed is registered, the executor replaces the WASM-provided `EventSubType` with a randomly chosen value from a deterministic 50-element set, preventing event linkability.
 
+> **Scope: `PlainEvent` / `Event` only — does not apply to `AppEvent`.**
+> `AppEvent` is an application-level, non-user-directed, non-encrypted event; it has no `UserID` and therefore no per-user seed to drive subtype rotation. Its `EventSubType` is always the raw `[32]byte` value the WASM app emits, passed through unchanged to the on-chain `bytes32` topic.
+
 ---
 
 ## 1. ASSOCIATEKEY Payload Format
@@ -115,6 +118,8 @@ At event emission time, the executor picks a **cryptographically random** index 
 
 ### Event encryption flow
 
+This flow applies **only to `PlainEvent`** (user-directed events). `AppEvent`s bypass it entirely: their subtype is never rewritten, since there is no `UserID` to look up a seed for.
+
 When `encryptEvents()` processes each `PlainEvent`:
 
 ```
@@ -141,11 +146,13 @@ When `encryptEvents()` processes each `PlainEvent`:
 
 ## 6. Data Structures
 
+The structures below are the ones affected by this feature. `AppEvent` is intentionally omitted: it is out of scope (see Overview) and its `EventSubType` is emitted unchanged.
+
 ### PlainEvent (pre-encryption, output from WASM)
 ```go
 type PlainEvent struct {
     UserID       ethCommon.Address  // recipient
-    EventSubType string             // original subtype from WASM
+    EventSubType [32]byte           // original subtype from WASM (bytes32 on-chain)
     Data         []byte             // plaintext event data
 }
 ```
@@ -155,7 +162,7 @@ type PlainEvent struct {
 type Event struct {
     ApplicationID ApplicationIdType  // app ID
     UserID        ethCommon.Address   // recipient
-    EventSubType  string              // privacy-preserving or original
+    EventSubType  [32]byte            // privacy-preserving or original (bytes32 on-chain)
     EncryptedData []byte              // AES-256-GCM encrypted data
 }
 ```
@@ -165,7 +172,7 @@ type Event struct {
 event UserEvent(
     uint64 indexed applicationId,
     bytes32 indexed requestId,
-    string indexed eventSubType,
+    bytes32 indexed eventSubType,
     bytes encryptedData
 );
 ```
@@ -194,6 +201,6 @@ To be compatible with this feature, a client must:
 1. **Generate 65 random bytes** to use as the seed
 2. **Encrypt the seed** using ECDH with the user's P521 private key and the enclave's P521 public key, producing a 93-byte AES-256-GCM envelope (12-byte nonce + 65-byte ciphertext + 16-byte tag)
 3. **Submit ASSOCIATEKEY** with 226-byte payload: `P521_public_key (133) || encrypted_seed (93)`
-4. **Query events** using `eventSubType` — the client must be aware that with a seed, subtypes are no longer application-defined but are hex-encoded HMAC values. The client can reconstruct all 50 possible subtypes using `HMAC-SHA256(seed, byte(i))` for `i` in `[1, 50]` to filter events.
+4. **Query events** using `eventSubType` — the client must be aware that with a seed, subtypes are no longer application-defined but are the raw 32-byte HMAC digests. The client can reconstruct all 50 possible subtypes using `HMAC-SHA256(seed, byte(i))` for `i` in `[1, 50]` to filter events.
 
 If the client does **not** want privacy-preserving subtypes, it submits the 133-byte payload (key only) as before — fully backward compatible.
