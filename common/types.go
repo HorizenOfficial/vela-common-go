@@ -11,22 +11,23 @@ import (
 	ethCommon "github.com/ethereum/go-ethereum/common"
 )
 
-// NativeTokenAddress is the sentinel value used wherever a token-address field
-// must refer to the chain's native token (ETH / HZN). The ProcessorEndpoint
-// contract distinguishes ETH-denominated requests from ERC-20 ones by comparing
-// the supplied tokenAddress to address(0); this helper centralizes that
-// convention on the Go side so callers don't open-code ethCommon.Address{} and
-// lose intent. Returned by value — Address is a 20-byte array, so callers
-// can't mutate a shared instance.
-func NativeTokenAddress() ethCommon.Address {
-	return ethCommon.Address{}
-}
-
 // ETH_TOKEN is the package-level sentinel for the chain's native token
-// (mirrors `address constant ETH_TOKEN = address(0)` in the Solidity contracts).
-// Prefer this name in code that compares against or assigns the sentinel —
-// it reads more naturally than the function form. Do not assign to it.
-var ETH_TOKEN = NativeTokenAddress()
+// (ETH / HZN). The ProcessorEndpoint contract distinguishes ETH-denominated
+// requests from ERC-20 ones by comparing the supplied tokenAddress to
+// address(0); this constant centralizes that convention on the Go side so
+// callers don't open-code ethCommon.Address{} and lose intent.
+//
+// The Solidity side defines an analogous named sentinel in Structs.sol:
+//
+//	address constant ETH_TOKEN = address(0);
+//
+// Sharing the name across Go and Solidity means a single grep "ETH_TOKEN"
+// surfaces every reference across the entire stack.
+//
+// Must be var, not const: ethCommon.Address is [20]byte, and Go forbids
+// const arrays. Treat as immutable — do not assign to it. The ALL_CAPS
+// name carries the contract by convention.
+var ETH_TOKEN = ethCommon.Address{}
 
 // ConstructorParams is an alias for raw JSON constructor parameters passed to the guest deploy function.
 type ConstructorParams = json.RawMessage
