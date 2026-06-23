@@ -137,6 +137,16 @@ func hex32(t *testing.T, s string) [32]byte {
 	return out
 }
 
+// TestSerialize_RoundTripBIP32Vector1Master parses the canonical master
+// xpub, serializes it back, and asserts byte-for-byte identity. The
+// positive vector comes from BIP-32 Test Vector 1 (external spec).
+func TestSerialize_RoundTripBIP32Vector1Master(t *testing.T) {
+	const masterXpub = "xpub661MyMwAqRbcFtXgS5sYJABqqG9YLmC4Q1Rdap9gSE8NqtwybGhePY2gZ29ESFjqJoCu1Rupje8YtGqsefD265TMg7usUDFdp6W1EGMcet8"
+	k, err := ParseXpub(masterXpub)
+	require.NoError(t, err)
+	assert.Equal(t, masterXpub, k.Serialize(), "Serialize must invert ParseXpub")
+}
+
 // TestMasterKey_BIP32Vector1 derives the master extended public key from
 // BIP-32 Test Vector 1's 16-byte seed (000102030405060708090a0b0c0d0e0f)
 // and verifies the resulting pubkey + chain code match the spec's master.

@@ -3,6 +3,7 @@ package bip32
 import (
 	"bytes"
 	"crypto/sha256"
+	"encoding/binary"
 	"errors"
 	"fmt"
 
@@ -109,4 +110,63 @@ func doubleSHA256(b []byte) []byte {
 	first := sha256.Sum256(b)
 	second := sha256.Sum256(first[:])
 	return second[:]
+}
+
+// Serialize encodes an ExtendedKey to its BIP-32 Base58Check string form
+// (the canonical `xpub6…` representation). The output is the exact inverse
+// of ParseXpub for any well-formed input: ParseXpub(Serialize(k)) == k.
+func (k ExtendedKey) Serialize() string {
+	payload := make([]byte, 0, xpubPayloadLen)
+	payload = append(payload, k.Version[:]...)
+	payload = append(payload, k.Depth)
+	payload = append(payload, k.ParentFP[:]...)
+	var childBE [4]byte
+	binary.BigEndian.PutUint32(childBE[:], k.ChildNumber)
+	payload = append(payload, childBE[:]...)
+	payload = append(payload, k.ChainCode[:]...)
+	payload = append(payload, k.PubKey[:]...)
+
+	cksum := doubleSHA256(payload)[:4]
+	full := append(payload, cksum...)
+	return base58Encode(full)
+}
+
+// base58Encode is the inverse of base58Decode using the Bitcoin alphabet.
+// Leading 0x00 bytes in the input produce leading '1' characters in the
+// output (canonical Base58 convention).
+func base58Encode(b []byte) string {
+	zeros := 0
+	for zeros < len(b) && b[zeros] == 0 {
+		zeros++
+	}
+
+	src := append([]byte{}, b...)
+	var encoded []byte
+	for {
+		allZero := true
+		for _, x := range src {
+			if x != 0 {
+				allZero = false
+				break
+			}
+		}
+		if allZero {
+			break
+		}
+		var rem uint32
+		for i, x := range src {
+			acc := rem*256 + uint32(x)
+			src[i] = byte(acc / 58)
+			rem = acc % 58
+		}
+		encoded = append(encoded, base58Alphabet[rem])
+	}
+
+	for i := 0; i < zeros; i++ {
+		encoded = append(encoded, '1')
+	}
+	for i, j := 0, len(encoded)-1; i < j; i, j = i+1, j-1 {
+		encoded[i], encoded[j] = encoded[j], encoded[i]
+	}
+	return string(encoded)
 }
