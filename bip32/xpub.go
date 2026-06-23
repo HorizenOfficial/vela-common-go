@@ -5,6 +5,8 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+
+	secp256k1 "github.com/decred/dcrd/dcrec/secp256k1/v4"
 )
 
 // Base58Check (Bitcoin) alphabet — note the deliberate absence of 0, O, I, l.
@@ -20,10 +22,12 @@ const xpubPayloadLen = 78
 var ErrInvalidXpub = errors.New("bip32: invalid xpub")
 
 // ParseXpub decodes a BIP-32 Base58Check-encoded extended public key into an
-// ExtendedKey. It verifies the 4-byte double-SHA256 checksum and the
-// 33-byte SEC1-compressed pubkey shape (first byte must be 0x02 or 0x03).
-// It does not enforce a specific Version — callers that require mainnet xpub
-// can compare against MainnetXpubVersion after parsing.
+// ExtendedKey. It verifies the 4-byte double-SHA256 checksum, the SEC1
+// compressed-pubkey prefix (0x02 or 0x03), and that the pubkey bytes
+// decompress to a valid point on the secp256k1 curve (fail-fast — without
+// this, off-curve junk only surfaces later in CKDpub / address derivation).
+// It does not enforce a specific Version — callers that require mainnet
+// xpub can compare against MainnetXpubVersion after parsing.
 func ParseXpub(s string) (ExtendedKey, error) {
 	raw, err := base58Decode(s)
 	if err != nil {
@@ -49,6 +53,9 @@ func ParseXpub(s string) (ExtendedKey, error) {
 
 	if k.PubKey[0] != 0x02 && k.PubKey[0] != 0x03 {
 		return ExtendedKey{}, fmt.Errorf("%w: pubkey prefix 0x%02x is not compressed (want 0x02 or 0x03)", ErrInvalidXpub, k.PubKey[0])
+	}
+	if _, err := secp256k1.ParsePubKey(k.PubKey[:]); err != nil {
+		return ExtendedKey{}, fmt.Errorf("%w: pubkey not on curve: %v", ErrInvalidXpub, err)
 	}
 
 	return k, nil

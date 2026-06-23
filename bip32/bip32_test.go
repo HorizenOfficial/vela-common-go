@@ -136,3 +136,57 @@ func hex32(t *testing.T, s string) [32]byte {
 	copy(out[:], b)
 	return out
 }
+
+// TestMasterKey_BIP32Vector1 derives the master extended public key from
+// BIP-32 Test Vector 1's 16-byte seed (000102030405060708090a0b0c0d0e0f)
+// and verifies the resulting pubkey + chain code match the spec's master.
+// Reference: https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki
+func TestMasterKey_BIP32Vector1(t *testing.T) {
+	seed, err := hex.DecodeString("000102030405060708090a0b0c0d0e0f")
+	require.NoError(t, err)
+	require.Len(t, seed, 16)
+
+	master, err := MasterKey(seed)
+	require.NoError(t, err)
+
+	assert.Equal(t, uint8(0), master.Depth, "master depth must be 0")
+	assert.Equal(t, uint32(0), master.ChildNumber, "master child number must be 0")
+	assert.Equal(t, [4]byte{0, 0, 0, 0}, master.ParentFP, "master parent fingerprint must be zero")
+	assert.Equal(t, MainnetXpubVersion, master.Version)
+	assert.Equal(t, "0339a36013301597daef41fbe593a02cc513d0b55527ec2df1050e2e8ff49c85c2", hex.EncodeToString(master.PubKey[:]))
+	assert.Equal(t, "873dff81c02f525623fd1fe5167eac3a55a049de3d314bb42ee227ffed37d508", hex.EncodeToString(master.ChainCode[:]))
+}
+
+// TestMasterKey_SeedLengthBounds covers the BIP-32 spec's 16–64 byte seed
+// length rule. Lengths outside that range are rejected.
+func TestMasterKey_SeedLengthBounds(t *testing.T) {
+	_, err := MasterKey(make([]byte, 15))
+	assert.Error(t, err, "15-byte seed must be rejected")
+	_, err = MasterKey(make([]byte, 65))
+	assert.Error(t, err, "65-byte seed must be rejected")
+
+	// Boundary values pass length check (independent of derivation outcome).
+	_, err = MasterKey(make([]byte, 16))
+	assert.NoError(t, err, "16-byte seed must be accepted")
+	_, err = MasterKey(make([]byte, 64))
+	assert.NoError(t, err, "64-byte seed must be accepted")
+}
+
+// TestParseXpub_RejectsOffCurvePubkey covers the fail-fast on-curve branch in
+// ParseXpub. offCurveXpub is a fixed, externally-generated Base58Check xpub:
+// a well-formed envelope (mainnet version, valid 4-byte checksum) whose 33-byte
+// pubkey field has a valid 0x02 prefix but an X coordinate that is not on the
+// secp256k1 curve. It therefore passes every earlier check (length, prefix,
+// checksum) and exercises only the curve validation, which must reject it.
+//
+// The fixture is a constant rather than synthesized at runtime so the test
+// input is independent of the code under test (base58Decode / doubleSHA256) —
+// the same property that makes the positive BIP-32 vectors trustworthy.
+func TestParseXpub_RejectsOffCurvePubkey(t *testing.T) {
+	const offCurveXpub = "xpub661MyMwAqRbcEYS8w7XLSVeEsBXy79zSzH1J8vCdxAZningWLdN3zgtU6Q5JXayek4PRsn35jii4veMimro1xefsM58PgBMrvdYrdxDSid5"
+
+	_, err := ParseXpub(offCurveXpub)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrInvalidXpub)
+	assert.Contains(t, err.Error(), "not on curve")
+}

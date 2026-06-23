@@ -6,7 +6,7 @@
 // depends on:
 //   - crypto/hmac + crypto/sha512    (stdlib, BIP-32 derivation)
 //   - crypto/sha256                  (stdlib, Base58Check checksum)
-//   - dcrec/secp256k1/v4             (pure-Go secp256k1 — TinyGo-verified by spike 005)
+//   - dcrec/secp256k1/v4             (pure-Go secp256k1)
 //   - golang.org/x/crypto/sha3       (pure-Go Keccak-256 for Ethereum addresses)
 //
 // Scope: non-hardened CKDpub only. Hardened derivation (index >= 2^31) requires
@@ -28,13 +28,13 @@ import (
 
 // ExtendedKey is a BIP-32 extended public key.
 //
-// PubKey is the SEC1-compressed (33-byte) secp256k1 public key.
-// ChainCode is the 32-byte chain code used to derive children.
-// Depth, ChildNumber, ParentFP, Version are metadata populated by ParseXpub
-// and propagated through CKDpub for serialization fidelity. CKDpub does not
-// recompute ParentFP on derived children (it would require RIPEMD-160 and is
-// not needed for sub-address derivation); String() on a CKDpub-derived child
-// therefore emits a zero ParentFP. Re-serializing parsed parents is exact.
+// PubKey is the SEC1-compressed (33-byte) secp256k1 public key. ChainCode
+// is the 32-byte chain code used to derive children. Depth, ChildNumber,
+// ParentFP, and Version are populated by ParseXpub from the input encoding
+// and carried for round-trip fidelity (no serializer ships in v1); CKDpub
+// sets the child's Depth and ChildNumber but leaves ParentFP zero — the
+// BIP-32 fingerprint is HASH160(parent.PubKey) and not needed for
+// sub-address derivation, so it isn't computed.
 type ExtendedKey struct {
 	PubKey      [33]byte
 	ChainCode   [32]byte
@@ -121,3 +121,45 @@ func CKDpub(parent ExtendedKey, index uint32) (ExtendedKey, error) {
 
 	return child, nil
 }
+
+// MasterKey derives the BIP-32 master extended public key from a seed.
+//
+// I = HMAC-SHA512("Bitcoin seed", seed); IL is the master private scalar,
+// IR is the master chain code. The returned ExtendedKey carries only the
+// public-side material (compressed pubkey + chain code) plus Depth = 0 and
+// MainnetXpubVersion; the private scalar is not retained.
+//
+// The seed must be 16–64 bytes per the BIP-32 spec; 32 bytes is the
+// vela-ned convention. Returns ErrInvalidDerivation if IL is zero or
+// >= curve order (statistically negligible but the spec mandates the check).
+func MasterKey(seed []byte) (ExtendedKey, error) {
+	if len(seed) < 16 || len(seed) > 64 {
+		return ExtendedKey{}, fmt.Errorf("bip32: master seed length %d outside [16, 64]", len(seed))
+	}
+
+	mac := hmac.New(sha512.New, []byte("Bitcoin seed"))
+	mac.Write(seed)
+	I := mac.Sum(nil)
+	IL, IR := I[:32], I[32:]
+
+	var ilScalar secp256k1.ModNScalar
+	overflow := ilScalar.SetByteSlice(IL)
+	if overflow || ilScalar.IsZero() {
+		return ExtendedKey{}, ErrInvalidDerivation
+	}
+
+	var pointJ secp256k1.JacobianPoint
+	secp256k1.ScalarBaseMultNonConst(&ilScalar, &pointJ)
+	pointJ.ToAffine()
+	pub := secp256k1.NewPublicKey(&pointJ.X, &pointJ.Y)
+
+	var k ExtendedKey
+	copy(k.PubKey[:], pub.SerializeCompressed())
+	copy(k.ChainCode[:], IR)
+	k.Depth = 0
+	k.ChildNumber = 0
+	k.Version = MainnetXpubVersion
+
+	return k, nil
+}
+
