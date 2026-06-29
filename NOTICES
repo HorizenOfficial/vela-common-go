@@ -18,6 +18,19 @@ testify
   Notice:     Copyright (c) 2012-2020 Mat Ryer, Tyler Bunnell, and contributors.
 
 ================================================================================
+COPYLEFT DEPENDENCIES - Go (Direct)
+================================================================================
+
+go-ethereum
+  Version:    v1.17.2
+  License:    LGPL-3.0-or-later
+  Source:     https://github.com/ethereum/go-ethereum
+  Notice:     Copyright 2014 The go-ethereum Authors.
+              The library packages used here (e.g. common) are licensed under
+              the GNU Lesser General Public License v3.0 or later. See the
+              COPYING.LESSER file in the upstream source for the full text.
+
+================================================================================
 PERMISSIVE DEPENDENCIES - Go (Indirect)
 ================================================================================
 
@@ -32,6 +45,18 @@ go-difflib
   License:    BSD-3-Clause
   Source:     https://github.com/pmezard/go-difflib
   Notice:     Copyright (c) 2013 Patrick Mezard.
+
+uint256
+  Version:    v1.3.2
+  License:    BSD-3-Clause
+  Source:     https://github.com/holiman/uint256
+  Notice:     Copyright 2020 uint256 Authors.
+
+golang.org/x/sys
+  Version:    v0.40.0
+  License:    BSD-3-Clause
+  Source:     https://cs.opensource.google/go/x/sys
+  Notice:     Copyright 2009 The Go Authors.
 
 yaml.v3
   Version:    v3.0.1

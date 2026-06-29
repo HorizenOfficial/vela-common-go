@@ -36,6 +36,10 @@ go mod tidy
 
 Tests use `testify` (assert & require packages) with table-driven and property-based patterns. Random tests use fixed seeds (e.g., `rand.NewSource(1234)`) for CI stability.
 
+## Dependency Attribution (NOTICES)
+
+Whenever a dependency is added or changed in `go.mod` (direct or indirect), check the `NOTICES` file and update it if necessary. Each module in the `go.mod` require blocks must have a corresponding entry with its version, license, source URL, and copyright notice. Group entries by license type — permissive deps go under the permissive sections; copyleft deps (e.g. LGPL/GPL like `go-ethereum`) get their own section. Run `go mod tidy` first so the require blocks reflect the actual dependency set before reconciling against `NOTICES`.
+
 ## Architecture
 
 ### Repository Layout
