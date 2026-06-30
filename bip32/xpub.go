@@ -2,12 +2,13 @@ package bip32
 
 import (
 	"bytes"
-	"crypto/sha256"
 	"encoding/binary"
 	"errors"
 	"fmt"
 
 	secp256k1 "github.com/decred/dcrd/dcrec/secp256k1/v4"
+
+	"github.com/HorizenOfficial/vela-common-go/wasm/hostcrypto"
 )
 
 // Base58Check (Bitcoin) alphabet — note the deliberate absence of 0, O, I, l.
@@ -107,8 +108,8 @@ func indexInAlphabet(c byte) int {
 }
 
 func doubleSHA256(b []byte) []byte {
-	first := sha256.Sum256(b)
-	second := sha256.Sum256(first[:])
+	first := hostcrypto.SHA256(b)
+	second := hostcrypto.SHA256(first[:])
 	return second[:]
 }
 

@@ -4,10 +4,11 @@
 //
 // The package is pure Go and compiles under TinyGo (no CGo, no unsafe). It
 // depends on:
-//   - crypto/hmac + crypto/sha512    (stdlib, BIP-32 derivation)
-//   - crypto/sha256                  (stdlib, Base58Check checksum)
-//   - dcrec/secp256k1/v4             (pure-Go secp256k1)
-//   - golang.org/x/crypto/sha3       (pure-Go Keccak-256 for Ethereum addresses)
+//   - vela-common-go/wasm/hostcrypto  (SHA-256 + HMAC-SHA-512 — host-bridged
+//     under TinyGo+WASI to sidestep Go-1.24's FIPS-stdlib lifecycle issue,
+//     stdlib-backed for native builds; transparent to callers)
+//   - dcrec/secp256k1/v4              (pure-Go secp256k1)
+//   - golang.org/x/crypto/sha3        (pure-Go Keccak-256 for Ethereum addresses)
 //
 // Scope: non-hardened CKDpub only. Hardened derivation (index >= 2^31) requires
 // the parent private key and is intentionally out of scope — vela-ned's WASM
@@ -17,13 +18,13 @@
 package bip32
 
 import (
-	"crypto/hmac"
-	"crypto/sha512"
 	"encoding/binary"
 	"errors"
 	"fmt"
 
 	secp256k1 "github.com/decred/dcrd/dcrec/secp256k1/v4"
+
+	"github.com/HorizenOfficial/vela-common-go/wasm/hostcrypto"
 )
 
 // ExtendedKey is a BIP-32 extended public key.
@@ -75,12 +76,12 @@ func CKDpub(parent ExtendedKey, index uint32) (ExtendedKey, error) {
 	}
 
 	// I = HMAC-SHA512(Key = parent.ChainCode, Data = parent.PubKey || ser32(i))
-	mac := hmac.New(sha512.New, parent.ChainCode[:])
-	mac.Write(parent.PubKey[:])
 	var idxBE [4]byte
 	binary.BigEndian.PutUint32(idxBE[:], index)
-	mac.Write(idxBE[:])
-	I := mac.Sum(nil)
+	data := make([]byte, 0, 33+4)
+	data = append(data, parent.PubKey[:]...)
+	data = append(data, idxBE[:]...)
+	I := hostcrypto.HMACSHA512(parent.ChainCode[:], data)
 
 	IL, IR := I[:32], I[32:]
 
@@ -137,9 +138,7 @@ func MasterKey(seed []byte) (ExtendedKey, error) {
 		return ExtendedKey{}, fmt.Errorf("bip32: master seed length %d outside [16, 64]", len(seed))
 	}
 
-	mac := hmac.New(sha512.New, []byte("Bitcoin seed"))
-	mac.Write(seed)
-	I := mac.Sum(nil)
+	I := hostcrypto.HMACSHA512([]byte("Bitcoin seed"), seed)
 	IL, IR := I[:32], I[32:]
 
 	var ilScalar secp256k1.ModNScalar
