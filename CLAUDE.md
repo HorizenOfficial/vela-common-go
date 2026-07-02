@@ -87,7 +87,6 @@ New top-level directories should follow the same pattern: sub-packages grouped b
 - `DefaultSubtypeN` - Default number of subtypes generated (`50`).
 - `GenerateSubtype(seed, i)` - Returns `HMAC-SHA256(key=seed, data=byte(i))` as a `[32]byte`. Raw 32 bytes match the on-chain `bytes32` event subtype — no hex re-encoding at the boundary.
 - `AllSubtypes(seed, n)` - Returns `n` subtypes (`GenerateSubtype(seed, 1..n)`) — the deterministic filter set off-chain consumers feed to the subgraph's `GetUserEventsBySubTypes` to discover events `encryptEvents` rotated via `GenerateRandomSubtype` (which itself stays in `vela/pkg/executor` because it depends on `crypto/rand`).
-- `GenerateSubtypes(seed)` / `GenerateSubtypesN(seed, n)` - Deprecated aliases for `AllSubtypes`; kept for backward compat with pre-dedup callers. New code should use `AllSubtypes` directly.
 
 ### WASM Sandbox Design
 

@@ -56,21 +56,3 @@ func AllSubtypes(seed []byte, n int) [][32]byte {
 	}
 	return out
 }
-
-// GenerateSubtypes is a deprecated alias for AllSubtypes(seed, DefaultSubtypeN).
-//
-// Deprecated: use AllSubtypes(seed, DefaultSubtypeN) directly. Kept for
-// backward compatibility with `vela-ned/scheduler/internal/discovery` (and
-// any out-of-tree callers) that landed before the b-full dedup; new code
-// should use AllSubtypes.
-func GenerateSubtypes(seed []byte) [][32]byte {
-	return AllSubtypes(seed, DefaultSubtypeN)
-}
-
-// GenerateSubtypesN is a deprecated alias for AllSubtypes.
-//
-// Deprecated: use AllSubtypes(seed, n) directly. Kept for backward
-// compatibility with pre-dedup callers; new code should use AllSubtypes.
-func GenerateSubtypesN(seed []byte, n int) [][32]byte {
-	return AllSubtypes(seed, n)
-}
