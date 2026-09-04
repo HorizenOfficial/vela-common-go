@@ -82,9 +82,11 @@ New top-level directories should follow the same pattern: sub-packages grouped b
 
 ### Subtypes Package Structure
 
-**`subtypes/`** - Privacy-preserving event subtype generation:
-- `GenerateSubtypes(seed)` / `GenerateSubtypesN(seed, n)` - Derive `n` deterministic `[32]byte` subtypes from a seed as `HMAC-SHA256(key=seed, data=byte(index))` for `index` in `[1, n]`. The raw 32 bytes match the on-chain `bytes32` event subtype — no hex re-encoding at the boundary.
+**`subtypes/`** - Privacy-preserving event subtype generation, the cross-repo source of truth for the seed-derivation constant and the deterministic subtype-set generator:
+- `SubtypeKeyMessage` - The fixed bytestring users sign (after `keccak256`-hashing) under their secp256k1 EOA key to derive their 65-byte seed. Wire-format constant; rotating it invalidates every existing seed.
 - `DefaultSubtypeN` - Default number of subtypes generated (`50`).
+- `GenerateSubtype(seed, i)` - Returns `HMAC-SHA256(key=seed, data=byte(i))` as a `[32]byte`. Raw 32 bytes match the on-chain `bytes32` event subtype — no hex re-encoding at the boundary.
+- `AllSubtypes(seed, n)` - Returns `n` subtypes (`GenerateSubtype(seed, 1..n)`) — the deterministic filter set off-chain consumers feed to the subgraph's `GetUserEventsBySubTypes` to discover events `encryptEvents` rotated via `GenerateRandomSubtype` (which itself stays in `vela/pkg/executor` because it depends on `crypto/rand`).
 
 ### WASM Sandbox Design
 

@@ -159,7 +159,7 @@ func (z Uint256) String() string {
 	const ten = uint64(10)
 	for !val.IsZero() {
 		var rem uint64
-		val, rem = val.divModWord(ten)
+		val, rem = val.DivMod64(ten)
 		res = append(res, byte(rem)+'0')
 	}
 
@@ -170,8 +170,8 @@ func (z Uint256) String() string {
 	return string(res)
 }
 
-// divModWord computes z / divisor and z % divisor. We assume the divisor has been checked by the caller to be != 0
-func (z Uint256) divModWord(divisor uint64) (Uint256, uint64) {
+// DivMod64 computes z / divisor and z % divisor. We assume the divisor has been checked by the caller to be != 0
+func (z Uint256) DivMod64(divisor uint64) (Uint256, uint64) {
 	var quot Uint256
 	var r uint64
 
