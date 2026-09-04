@@ -162,23 +162,6 @@ func TestPtrToAddress(t *testing.T) {
 }
 
 func TestResultTypesJSON(t *testing.T) {
-	t.Run("LoadModuleResult", func(t *testing.T) {
-		result := LoadModuleResult{
-			State: []byte("state data"),
-			Fuel:  NewUint256(500),
-			Error: "",
-		}
-
-		data, err := json.Marshal(result)
-		require.NoError(t, err)
-
-		var parsed LoadModuleResult
-		err = json.Unmarshal(data, &parsed)
-		require.NoError(t, err)
-		require.Equal(t, result.State, parsed.State)
-		require.Equal(t, result.Fuel.String(), parsed.Fuel.String())
-	})
-
 	t.Run("DepositResult", func(t *testing.T) {
 		depositSubType := [32]byte{0x01, 0x02}
 		depositReceivedSubType := [32]byte{0x03, 0x04}

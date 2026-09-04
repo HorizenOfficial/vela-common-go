@@ -31,7 +31,7 @@ Core data types for the WASM guest environment.
 | `Address` | Ethereum-style 20-byte address. JSON serializes as `0x`-prefixed hex. |
 | `PlainEvent` | Guest-side event with user ID, sub-type, and data payload. |
 | `Withdrawal` | Withdrawal request with destination address and amount. |
-| `LoadModuleResult`, `DepositResult`, `ProcessResult`, `DeanonymizationResult` | Result types returned by WASM-exported functions. |
+| `DepositResult`, `ProcessResult`, `DeanonymizationResult` | Result types returned by WASM-exported functions. |
 | `MemoryStats` | Allocation statistics from the memory manager. |
 
 ### `utils`
