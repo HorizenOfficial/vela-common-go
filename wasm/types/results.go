@@ -13,13 +13,6 @@ package types
 // Similarly we use math/big.Int in the host and Uint256 type in the guest.
 // ---
 
-// LoadModuleResult is a local replacement for wasmCommon.LoadModuleResult
-type LoadModuleResult struct {
-	State []byte   `json:"state"`
-	Fuel  *Uint256 `json:"fuel"`
-	Error string   `json:"error,omitempty"`
-}
-
 // DepositResult is a local replacement for wasmCommon.DepositResult
 type DepositResult struct {
 	State     []byte       `json:"state"`
