@@ -109,7 +109,7 @@ The host uses `math/big.Int` and `go-ethereum/common.Address`; the guest uses `U
 - `Uint256` - 256-bit unsigned integer as `[4]uint64` (little-endian words), with overflow-detecting arithmetic
 - `Address` - Ethereum-style 20-byte address
 - `PlainEvent`, `AppEvent`, `Withdrawal` - Domain types replacing host equivalents
-- Result types (`LoadModuleResult`, `DepositResult`, `ProcessResult`, `DeployResult`) - WASM operation returns. `DepositResult` and `ProcessResult` include `AppEvents []AppEvent` for application-level non-encrypted events
+- Result types (`DepositResult`, `ProcessResult`, `DeployResult`) - WASM operation returns. `DepositResult` and `ProcessResult` include `AppEvents []AppEvent` for application-level non-encrypted events
 - `helpers.go` - WASM pointer ↔ type conversion (`PtrToUint256`, `PtrToAddress`, `SerializeAndWriteResult`)
 
 **`wasm/utils/`** - Runtime utilities:
